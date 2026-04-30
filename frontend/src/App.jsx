@@ -7,6 +7,7 @@ import UploadAnalyzePage from './pages/UploadAnalyzePage'
 import PatientRecordsPage from './pages/PatientRecordsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SettingsPage from './pages/SettingsPage'
+import Chatbot from './components/Chatbot'
 import './App.css'
 
 function App() {
@@ -140,6 +141,9 @@ function App() {
         {activePage === 'analytics' && <AnalyticsPage />}
         {activePage === 'settings' && <SettingsPage />}
       </div>
+
+      {/* Global floating chatbot — visible on every page */}
+      <Chatbot />
     </div>
   )
 }
