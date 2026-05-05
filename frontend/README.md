@@ -1,16 +1,52 @@
-# React + Vite
+# RetinaCare: Diabetic Retinopathy Detection Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, AI-powered clinical dashboard for screening and monitoring Diabetic Retinopathy (DR) using Deep Learning and Google Gemini.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **AI Inference**: Automated DR grading (0-4) using a ResNet50 model.
+- **RetinAI Assistant**: Interactive chatbot powered by Gemini 2.0 for clinical guidance.
+- **Clinical Dashboard**: Real-time stats on scans, urgent cases, and patient trends.
+- **Patient Management**: Timeline-based records and progression tracking.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Setup Instructions
 
-## Expanding the ESLint configuration
+### 1. Prerequisites
+- Node.js (v18+)
+- Python (v3.10+)
+- Git LFS (`git lfs install`)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2. Frontend Setup (React + Vite)
+```bash
+cd frontend
+npm install
+cp .env.example .env
+# Add your VITE_GEMINI_API_KEY to .env
+npm run dev
+```
+
+### 3. Backend Setup (FastAPI + PyTorch)
+The backend runs the ResNet50 model locally.
+```bash
+cd backend
+python -m pip install -r requirements.txt
+# Download the model files
+git lfs install
+git clone https://huggingface.co/sakshamkr1/ResNet50-APTOS-DR
+# Start the server
+python main.py
+```
+
+---
+
+## 🧠 Model Information
+The platform uses a **ResNet50** architecture trained on the **APTOS 2019 Blindness Detection** dataset. 
+- **Input**: 224x224 Retinal Fundus Images.
+- **Output**: 5-class classification (No DR, Mild, Moderate, Severe, Proliferative DR).
+
+---
+
+## 📄 License
+This project is for educational and research purposes. Always consult a qualified ophthalmologist for clinical decisions.

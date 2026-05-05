@@ -1,0 +1,23 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Large Files / Model (Optional: users should clone this themselves)
+backend/ResNet50-APTOS-DR/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

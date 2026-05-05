@@ -11,10 +11,12 @@ function RiskBadge({ risk }) {
 
 function UploadAnalyzePage() {
   const [previewImage, setPreviewImage] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(false)
-  const [result, setResult] = useState({ grade: 2, confidence: 86, risk: 'Medium' })
+  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low' })
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     return () => {
@@ -33,19 +35,79 @@ function UploadAnalyzePage() {
     }
 
     setPreviewImage(URL.createObjectURL(file))
+    setSelectedFile(file)
+    setError(null)
   }
 
-  const handleAnalyze = () => {
-    if (!previewImage) return
-    setIsAnalyzing(true)
+  const queryModel = async (file) => {
+    const rawToken = import.meta.env.VITE_HF_TOKEN
+    const token = rawToken?.trim()
+    
+    if (!token) {
+      console.error('HF Token is missing or empty')
+      throw new Error('Hugging Face token not found. Please add VITE_HF_TOKEN to your .env file and RESTART your dev server.')
+    }
 
-    setTimeout(() => {
-      const grade = Math.floor(Math.random() * 5)
-      const confidence = Math.floor(Math.random() * 16) + 82
-      const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
-      setResult({ grade, confidence, risk })
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(
+      'http://localhost:8000/analyze',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    )
+
+    if (!response.ok) {
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`
+      
+      try {
+        const errData = await response.json()
+        errorMessage = errData.error || errorMessage
+        
+        // Handle the "Model is loading" case specifically
+        if (response.status === 503 && errData.estimated_time) {
+          errorMessage = `Model is currently loading. Please try again in about ${Math.round(errData.estimated_time)} seconds.`
+        }
+      } catch (e) {
+        // If not JSON, try to get the text body (could be a Vite 404 page)
+        const text = await response.text().catch(() => '')
+        console.error('Non-JSON error response:', text)
+        if (response.status === 404) {
+          errorMessage = 'Endpoint not found (404). Please ensure the proxy in vite.config.js is working and the model name is correct.'
+        }
+      }
+      
+      throw new Error(errorMessage)
+    }
+
+    return await response.json()
+  }
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) return
+    setIsAnalyzing(true)
+    setError(null)
+
+    try {
+      const inferenceResult = await queryModel(selectedFile)
+      
+      // Our local backend returns { grade, confidence, probabilities } directly
+      if (inferenceResult && typeof inferenceResult.grade === 'number') {
+        const { grade, confidence } = inferenceResult
+        const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
+
+        setResult({ grade, confidence, risk })
+      } else {
+        throw new Error('Invalid response from local server. Expected grade and confidence.')
+      }
+    } catch (err) {
+      console.error('Analysis failed:', err)
+      setError(err.message)
+    } finally {
       setIsAnalyzing(false)
-    }, 1600)
+    }
   }
 
   return (
@@ -159,6 +221,13 @@ function UploadAnalyzePage() {
           <div className="flex items-center gap-2 text-sm text-sky-300">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-r-transparent" />
             Running model inference...
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-[24px] border border-rose-500/50 bg-rose-500/10 p-4 text-xs text-rose-300">
+            <p className="font-semibold uppercase tracking-wider text-rose-400">Error</p>
+            <p className="mt-1">{error}</p>
           </div>
         )}
       </Card>
