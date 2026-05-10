@@ -1,39 +1,22 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Upload } from 'lucide-react'
+import { ScanSearch, Upload } from 'lucide-react'
+import { Badge, Button, Card } from '../components/SharedUI'
 import { gradeLabels, pageTransition } from '../data/mockData'
-
-function Card({ children, className = '' }) {
-  return <section className={`rounded-2xl border border-slate-700/70 bg-slate-900/75 p-4 shadow-card ${className}`}>{children}</section>
-}
-
-function Button({ children, className = '', variant = 'primary', ...props }) {
-  const base = 'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60'
-  const variants = {
-    primary: 'bg-blue-500 text-slate-950 hover:bg-blue-400',
-    ghost: 'border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800',
-  }
-  return <button className={`${base} ${variants[variant]} ${className}`} {...props}>{children}</button>
-}
 
 function RiskBadge({ risk }) {
   const tone = { Low: 'green', Medium: 'yellow', High: 'orange', Critical: 'red' }[risk] || 'slate'
-  const tones = {
-    slate: 'bg-slate-800 text-slate-100 border-slate-700',
-    green: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40',
-    yellow: 'bg-amber-500/20 text-amber-300 border-amber-400/40',
-    orange: 'bg-orange-500/20 text-orange-300 border-orange-400/40',
-    red: 'bg-red-500/20 text-red-300 border-red-400/40',
-  }
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{risk}</span>
+  return <Badge label={risk} tone={tone} />
 }
 
 function UploadAnalyzePage() {
   const [previewImage, setPreviewImage] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(false)
-  const [result, setResult] = useState({ grade: 2, confidence: 86, risk: 'Medium' })
+  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low' })
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     return () => {
@@ -52,28 +35,93 @@ function UploadAnalyzePage() {
     }
 
     setPreviewImage(URL.createObjectURL(file))
+    setSelectedFile(file)
+    setError(null)
   }
 
-  const handleAnalyze = () => {
-    if (!previewImage) return
-    setIsAnalyzing(true)
+  const queryModel = async (file) => {
+    const rawToken = import.meta.env.VITE_HF_TOKEN
+    const token = rawToken?.trim()
+    
+    if (!token) {
+      console.error('HF Token is missing or empty')
+      throw new Error('Hugging Face token not found. Please add VITE_HF_TOKEN to your .env file and RESTART your dev server.')
+    }
 
-    setTimeout(() => {
-      const grade = Math.floor(Math.random() * 5)
-      const confidence = Math.floor(Math.random() * 16) + 82
-      const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
-      setResult({ grade, confidence, risk })
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(
+      'http://localhost:8000/analyze',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    )
+
+    if (!response.ok) {
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`
+      
+      try {
+        const errData = await response.json()
+        errorMessage = errData.error || errorMessage
+        
+        // Handle the "Model is loading" case specifically
+        if (response.status === 503 && errData.estimated_time) {
+          errorMessage = `Model is currently loading. Please try again in about ${Math.round(errData.estimated_time)} seconds.`
+        }
+      } catch (e) {
+        // If not JSON, try to get the text body (could be a Vite 404 page)
+        const text = await response.text().catch(() => '')
+        console.error('Non-JSON error response:', text)
+        if (response.status === 404) {
+          errorMessage = 'Endpoint not found (404). Please ensure the proxy in vite.config.js is working and the model name is correct.'
+        }
+      }
+      
+      throw new Error(errorMessage)
+    }
+
+    return await response.json()
+  }
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) return
+    setIsAnalyzing(true)
+    setError(null)
+
+    try {
+      const inferenceResult = await queryModel(selectedFile)
+      
+      // Our local backend returns { grade, confidence, probabilities } directly
+      if (inferenceResult && typeof inferenceResult.grade === 'number') {
+        const { grade, confidence } = inferenceResult
+        const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
+
+        setResult({ grade, confidence, risk })
+      } else {
+        throw new Error('Invalid response from local server. Expected grade and confidence.')
+      }
+    } catch (err) {
+      console.error('Analysis failed:', err)
+      setError(err.message)
+    } finally {
       setIsAnalyzing(false)
-    }, 1600)
+    }
   }
 
   return (
     <motion.div {...pageTransition} className="grid gap-5 xl:grid-cols-5">
       <div className="space-y-5 xl:col-span-3">
-        <Card>
-          <h3 className="mb-3 text-lg font-semibold text-slate-50">Upload Retinal Fundus Image</h3>
+        <Card className="bg-slate-900">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 01</p>
+            <h3 className="mt-2 text-2xl font-bold text-white">Upload retinal fundus image</h3>
+          </div>
           <label
-            className={`block rounded-xl border-2 border-dashed p-6 text-center transition ${isDragging ? 'border-blue-400 bg-blue-500/10' : 'border-slate-700 bg-slate-900/60'}`}
+            className={`block rounded-[28px] border-2 border-dashed p-8 text-center transition ${
+              isDragging ? 'border-sky-400 bg-sky-500/10' : 'border-slate-700 bg-slate-950'
+            }`}
             onDragOver={(event) => {
               event.preventDefault()
               setIsDragging(true)
@@ -85,9 +133,9 @@ function UploadAnalyzePage() {
               uploadFile(event.dataTransfer.files?.[0])
             }}
           >
-            <Upload className="mx-auto mb-3 text-blue-300" size={28} />
-            <p className="text-slate-100">Drag and drop JPG/PNG here</p>
-            <p className="mb-3 mt-1 text-xs text-slate-400">or click to browse files</p>
+            <Upload className="mx-auto mb-3 text-sky-300" size={28} />
+            <p className="text-lg font-semibold text-white">Drag and drop JPG/PNG here</p>
+            <p className="mb-3 mt-1 text-sm text-slate-400">or click to browse files from your device</p>
             <input
               type="file"
               accept="image/jpeg,image/png"
@@ -97,15 +145,18 @@ function UploadAnalyzePage() {
           </label>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-900 text-white">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-50">Image Preview</h3>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 02</p>
+              <h3 className="mt-1 text-2xl font-bold text-white">Image preview</h3>
+            </div>
             <Button onClick={handleAnalyze} disabled={!previewImage || isAnalyzing}>
               {isAnalyzing ? 'Analyzing...' : 'Analyze'}
             </Button>
           </div>
 
-          <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
+          <div className="relative overflow-hidden rounded-[28px] border border-slate-700 bg-slate-950">
             {previewImage ? (
               <>
                 <img src={previewImage} alt="Retinal fundus preview" className="h-96 w-full object-cover" />
@@ -120,47 +171,63 @@ function UploadAnalyzePage() {
         </Card>
       </div>
 
-      <Card className="space-y-4 xl:col-span-2">
-        <h3 className="text-lg font-semibold text-slate-50">Inference Results</h3>
-        <div>
-          <p className="text-sm text-slate-400">Predicted DR Grade</p>
-          <p className="text-3xl font-bold text-slate-100">{result.grade}</p>
-          <p className="text-sm text-blue-300">{gradeLabels[result.grade]}</p>
+      <Card className="space-y-5 bg-slate-900 xl:col-span-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 03</p>
+            <h3 className="mt-1 text-2xl font-bold text-white">Inference results</h3>
+          </div>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-500/10 text-sky-300">
+            <ScanSearch size={20} />
+          </span>
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between text-sm text-slate-300">
+        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-5">
+          <p className="text-sm text-slate-400">Predicted DR grade</p>
+          <p className="mt-1 text-4xl font-bold text-white">{result.grade}</p>
+          <p className="mt-2 text-sm text-sky-300">{gradeLabels[result.grade]}</p>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-5">
+          <div className="mb-2 flex items-center justify-between text-sm text-slate-400">
             <span>Confidence Score</span>
             <span>{result.confidence}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-700">
-            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${result.confidence}%` }} />
+          <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${result.confidence}%` }} />
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/40 p-3">
+        <div className="flex items-center justify-between rounded-[24px] border border-slate-700 bg-slate-950 p-4">
           <div>
-            <p className="text-sm font-semibold text-slate-100">Grad-CAM Heatmap</p>
-            <p className="text-xs text-slate-400">Visual attention overlay placeholder</p>
+            <p className="text-sm font-semibold text-white">Grad-CAM heatmap</p>
+            <p className="text-xs text-slate-400">Overlay the model attention view on the image preview</p>
           </div>
           <button
             type="button"
-            className={`h-7 w-12 rounded-full p-1 transition ${showHeatmap ? 'bg-blue-500' : 'bg-slate-700'}`}
+            className={`h-7 w-12 rounded-full p-1 transition ${showHeatmap ? 'bg-sky-500' : 'bg-slate-700'}`}
             onClick={() => setShowHeatmap((prev) => !prev)}
           >
             <span className={`block h-5 w-5 rounded-full bg-white transition ${showHeatmap ? 'translate-x-5' : ''}`} />
           </button>
         </div>
 
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-3">
-          <p className="mb-2 text-sm text-slate-400">Risk Classification</p>
+        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-4">
+          <p className="mb-2 text-sm text-slate-400">Risk classification</p>
           <RiskBadge risk={result.risk} />
         </div>
 
         {isAnalyzing && (
-          <div className="flex items-center gap-2 text-sm text-blue-300">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-r-transparent" />
+          <div className="flex items-center gap-2 text-sm text-sky-300">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-r-transparent" />
             Running model inference...
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-[24px] border border-rose-500/50 bg-rose-500/10 p-4 text-xs text-rose-300">
+            <p className="font-semibold uppercase tracking-wider text-rose-400">Error</p>
+            <p className="mt-1">{error}</p>
           </div>
         )}
       </Card>

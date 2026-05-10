@@ -16,7 +16,8 @@ export const pageTransition = {
 }
 
 export const navItems = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
+  { key: 'home', label: 'Home', icon: Home },
+  { key: 'dashboard', label: 'Dashboard', icon: Activity },
   { key: 'upload', label: 'Upload & Analyze', icon: UploadCloud },
   { key: 'records', label: 'Patient Records', icon: ClipboardList },
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
