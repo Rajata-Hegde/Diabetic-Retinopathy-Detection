@@ -15,7 +15,7 @@ function UploadAnalyzePage() {
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(false)
-  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low' })
+  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low', heatmap: null })
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -95,10 +95,10 @@ function UploadAnalyzePage() {
       
       // Our local backend returns { grade, confidence, probabilities } directly
       if (inferenceResult && typeof inferenceResult.grade === 'number') {
-        const { grade, confidence } = inferenceResult
+        const { grade, confidence, heatmap } = inferenceResult
         const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
 
-        setResult({ grade, confidence, risk })
+        setResult({ grade, confidence, risk, heatmap })
       } else {
         throw new Error('Invalid response from local server. Expected grade and confidence.')
       }
@@ -160,8 +160,17 @@ function UploadAnalyzePage() {
             {previewImage ? (
               <>
                 <img src={previewImage} alt="Retinal fundus preview" className="h-96 w-full object-cover" />
-                {showHeatmap && (
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_65%_45%,rgba(239,68,68,0.52),transparent_44%),radial-gradient(circle_at_38%_58%,rgba(59,130,246,0.45),transparent_36%)]" />
+                {showHeatmap && result.heatmap && (
+                  <img 
+                    src={`data:image/jpeg;base64,${result.heatmap}`} 
+                    alt="Grad-CAM Heatmap" 
+                    className="absolute inset-0 h-96 w-full object-cover opacity-70 mix-blend-screen"
+                  />
+                )}
+                {showHeatmap && !result.heatmap && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-900/60 text-xs text-sky-300">
+                    No heatmap available for this scan
+                  </div>
                 )}
               </>
             ) : (

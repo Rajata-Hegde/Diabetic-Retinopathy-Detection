@@ -7,6 +7,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import os
+import cv2
+import base64
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
 
 app = FastAPI()
 
@@ -78,10 +83,35 @@ async def analyze_image(file: UploadFile = File(...)):
         predicted_class = int(np.argmax(probs_array))
         confidence = float(np.max(probs_array))
 
+        # --- XAI: Generate Grad-CAM Heatmap ---
+        try:
+            # We target the last convolutional layer of ResNet50
+            target_layers = [model.layer4[-1]]
+            cam = GradCAM(model=model, target_layers=target_layers)
+            
+            # Generate CAM (Grad-CAM needs to run with gradients enabled)
+            grayscale_cam = cam(input_tensor=input_tensor, targets=None)
+            grayscale_cam = grayscale_cam[0, :]
+            
+            # Prepare the original image for overlay
+            img_np = np.array(image.resize((224, 224)))
+            img_float = np.float32(img_np) / 255
+            
+            # Create visualization
+            visualization = show_cam_on_image(img_float, grayscale_cam, use_rgb=True)
+            
+            # Convert to base64 for frontend
+            _, buffer = cv2.imencode('.jpg', cv2.cvtColor(visualization, cv2.COLOR_RGB2BGR))
+            heatmap_base64 = base64.b64encode(buffer).decode('utf-8')
+        except Exception as cam_err:
+            print(f"CAM generation failed: {cam_err}")
+            heatmap_base64 = None
+
         return {
             "grade": predicted_class,
             "confidence": round(confidence * 100, 2),
-            "probabilities": probs_array.tolist()
+            "probabilities": probs_array.tolist(),
+            "heatmap": heatmap_base64
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
