@@ -5,3 +5,7 @@ torch
 torchvision
 pillow
 numpy
+lime
+shap
+scikit-image
+pytorch-grad-cam

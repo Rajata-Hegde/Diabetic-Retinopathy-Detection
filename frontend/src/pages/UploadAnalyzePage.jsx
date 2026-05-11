@@ -14,8 +14,14 @@ function UploadAnalyzePage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [showHeatmap, setShowHeatmap] = useState(false)
-  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low', heatmap: null })
+  const [activeXai, setActiveXai] = useState('none') // 'none', 'gradcam', 'lime', 'shap'
+  const [result, setResult] = useState({ 
+    grade: 0, 
+    confidence: 0, 
+    risk: 'Low', 
+    explanations: { gradcam: null, lime: null, shap: null },
+    interpretation: ""
+  })
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -40,14 +46,6 @@ function UploadAnalyzePage() {
   }
 
   const queryModel = async (file) => {
-    const rawToken = import.meta.env.VITE_HF_TOKEN
-    const token = rawToken?.trim()
-    
-    if (!token) {
-      console.error('HF Token is missing or empty')
-      throw new Error('Hugging Face token not found. Please add VITE_HF_TOKEN to your .env file and RESTART your dev server.')
-    }
-
     const formData = new FormData()
     formData.append('file', file)
 
@@ -61,24 +59,13 @@ function UploadAnalyzePage() {
 
     if (!response.ok) {
       let errorMessage = `API Error: ${response.status} ${response.statusText}`
-      
       try {
         const errData = await response.json()
-        errorMessage = errData.error || errorMessage
-        
-        // Handle the "Model is loading" case specifically
-        if (response.status === 503 && errData.estimated_time) {
-          errorMessage = `Model is currently loading. Please try again in about ${Math.round(errData.estimated_time)} seconds.`
-        }
+        errorMessage = errData.detail || errorMessage
       } catch (e) {
-        // If not JSON, try to get the text body (could be a Vite 404 page)
         const text = await response.text().catch(() => '')
         console.error('Non-JSON error response:', text)
-        if (response.status === 404) {
-          errorMessage = 'Endpoint not found (404). Please ensure the proxy in vite.config.js is working and the model name is correct.'
-        }
       }
-      
       throw new Error(errorMessage)
     }
 
@@ -93,14 +80,14 @@ function UploadAnalyzePage() {
     try {
       const inferenceResult = await queryModel(selectedFile)
       
-      // Our local backend returns { grade, confidence, probabilities } directly
       if (inferenceResult && typeof inferenceResult.grade === 'number') {
-        const { grade, confidence, heatmap } = inferenceResult
+        const { grade, confidence, explanations, interpretation } = inferenceResult
         const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
 
-        setResult({ grade, confidence, risk, heatmap })
+        setResult({ grade, confidence, risk, explanations, interpretation })
+        setActiveXai('gradcam') // Default to Grad-CAM after analysis
       } else {
-        throw new Error('Invalid response from local server. Expected grade and confidence.')
+        throw new Error('Invalid response from local server.')
       }
     } catch (err) {
       console.error('Analysis failed:', err)
@@ -149,7 +136,7 @@ function UploadAnalyzePage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 02</p>
-              <h3 className="mt-1 text-2xl font-bold text-white">Image preview</h3>
+              <h3 className="mt-1 text-2xl font-bold text-white">Image preview & XAI Overlay</h3>
             </div>
             <Button onClick={handleAnalyze} disabled={!previewImage || isAnalyzing}>
               {isAnalyzing ? 'Analyzing...' : 'Analyze'}
@@ -160,23 +147,39 @@ function UploadAnalyzePage() {
             {previewImage ? (
               <>
                 <img src={previewImage} alt="Retinal fundus preview" className="h-96 w-full object-cover" />
-                {showHeatmap && result.heatmap && (
+                {activeXai !== 'none' && result.explanations[activeXai] && (
                   <img 
-                    src={`data:image/jpeg;base64,${result.heatmap}`} 
-                    alt="Grad-CAM Heatmap" 
-                    className="absolute inset-0 h-96 w-full object-cover opacity-70 mix-blend-screen"
+                    src={`data:image/jpeg;base64,${result.explanations[activeXai]}`} 
+                    alt={`${activeXai} Explanation`} 
+                    className={`absolute inset-0 h-96 w-full object-cover ${activeXai === 'lime' ? '' : 'opacity-70 mix-blend-screen'}`}
                   />
-                )}
-                {showHeatmap && !result.heatmap && (
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-900/60 text-xs text-sky-300">
-                    No heatmap available for this scan
-                  </div>
                 )}
               </>
             ) : (
               <div className="flex h-96 items-center justify-center text-slate-500">No image selected</div>
             )}
           </div>
+          
+          {result.explanations.gradcam && (
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {[
+                { id: 'none', label: 'Original' },
+                { id: 'gradcam', label: 'Grad-CAM' },
+                { id: 'lime', label: 'LIME' },
+                { id: 'shap', label: 'SHAP' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveXai(tab.id)}
+                  className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                    activeXai === tab.id ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 
@@ -207,19 +210,14 @@ function UploadAnalyzePage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-[24px] border border-slate-700 bg-slate-950 p-4">
-          <div>
-            <p className="text-sm font-semibold text-white">Grad-CAM heatmap</p>
-            <p className="text-xs text-slate-400">Overlay the model attention view on the image preview</p>
+        {result.interpretation && (
+          <div className="rounded-[24px] border border-sky-500/30 bg-sky-500/5 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-sky-400">Clinical Interpretation</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300 italic">
+              "{result.interpretation}"
+            </p>
           </div>
-          <button
-            type="button"
-            className={`h-7 w-12 rounded-full p-1 transition ${showHeatmap ? 'bg-sky-500' : 'bg-slate-700'}`}
-            onClick={() => setShowHeatmap((prev) => !prev)}
-          >
-            <span className={`block h-5 w-5 rounded-full bg-white transition ${showHeatmap ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
+        )}
 
         <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-4">
           <p className="mb-2 text-sm text-slate-400">Risk classification</p>
@@ -229,7 +227,7 @@ function UploadAnalyzePage() {
         {isAnalyzing && (
           <div className="flex items-center gap-2 text-sm text-sky-300">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-r-transparent" />
-            Running model inference...
+            Running Ensemble XAI (Grad-CAM + LIME + SHAP)...
           </div>
         )}
 
