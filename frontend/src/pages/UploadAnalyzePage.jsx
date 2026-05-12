@@ -19,8 +19,8 @@ function UploadAnalyzePage() {
     grade: 0, 
     confidence: 0, 
     risk: 'Low', 
-    explanations: { gradcam: null, lime: null, shap: null },
-    interpretation: ""
+    explanations: { gradcam: null, lime: null, shap: null, consensus: null },
+    interpretation: { summary: "", agreement_score: 0, methods_available: [] }
   })
   const [error, setError] = useState(null)
 
@@ -166,7 +166,8 @@ function UploadAnalyzePage() {
                 { id: 'none', label: 'Original' },
                 { id: 'gradcam', label: 'Grad-CAM' },
                 { id: 'lime', label: 'LIME' },
-                { id: 'shap', label: 'SHAP' }
+                { id: 'shap', label: 'SHAP' },
+                { id: 'consensus', label: '🎯 Consensus' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -210,11 +211,31 @@ function UploadAnalyzePage() {
           </div>
         </div>
 
-        {result.interpretation && (
+        {result.interpretation?.summary && (
+          <div className="rounded-[24px] border border-emerald-500/30 bg-emerald-500/5 p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-400">XAI Agreement Score</p>
+              <span className="text-lg font-bold text-emerald-400">{(result.interpretation.agreement_score * 100).toFixed(1)}%</span>
+            </div>
+            <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-slate-800">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 transition-all" 
+                style={{ width: `${result.interpretation.agreement_score * 100}%` }} 
+              />
+            </div>
+            {result.interpretation.methods_available?.length > 0 && (
+              <p className="mb-3 text-xs text-slate-400">
+                Methods: <span className="text-emerald-300 font-semibold">{result.interpretation.methods_available.join(", ")}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {result.interpretation?.summary && (
           <div className="rounded-[24px] border border-sky-500/30 bg-sky-500/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-sky-400">Clinical Interpretation</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300 italic">
-              "{result.interpretation}"
+            <p className="text-xs font-bold uppercase tracking-widest text-sky-400">🔬 Multi-Method Clinical Interpretation</p>
+            <p className="mt-3 text-xs leading-relaxed text-slate-300 font-mono whitespace-pre-wrap">
+              {result.interpretation.summary}
             </p>
           </div>
         )}
