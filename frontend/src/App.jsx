@@ -79,6 +79,19 @@ function App() {
     setPatientRecords(prev => [newRecord, ...prev])
   }
 
+  const handleDeleteRecord = async (recordId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/records/${recordId}`, { method: 'DELETE' })
+      if (response.ok) {
+        setPatientRecords(prev => prev.filter(r => r.id !== recordId))
+        return true
+      }
+    } catch (err) {
+      console.error("Failed to delete record:", err)
+    }
+    return false
+  }
+
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 selection:bg-sky-500/30">
       <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-black/20 backdrop-blur-2xl transition-all duration-500 xl:translate-x-0">
@@ -195,7 +208,7 @@ function App() {
               )}
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
               {activePage === 'upload' && <UploadAnalyzePage onScanComplete={addPatientRecord} />}
-              {activePage === 'records' && <PatientRecordsPage records={searchedRecords} />}
+              {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
               {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />}
               {activePage === 'settings' && <SettingsPage />}
             </motion.div>

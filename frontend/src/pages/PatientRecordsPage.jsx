@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Filter, MoreVertical, Eye, Calendar, User, ChevronRight, Hash, X, Download, ShieldAlert, Activity, FileText, Zap, Printer } from 'lucide-react'
 
-function PatientRecordsPage({ records }) {
+function PatientRecordsPage({ records, onDelete }) {
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [filterRisk, setFilterRisk] = useState('All')
   const [activeXai, setActiveXai] = useState('consensus')
@@ -341,7 +341,15 @@ function PatientRecordsPage({ records }) {
 
               {/* Footer Actions */}
               <div className="p-8 border-t border-white/5 flex justify-end gap-4 bg-white/5">
-                 <button className="h-14 px-8 rounded-2xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 transition-all">
+                 <button 
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to permanently delete this diagnostic record?")) {
+                      const success = await onDelete(selectedRecord.id)
+                      if (success) setSelectedRecord(null)
+                    }
+                  }}
+                  className="h-14 px-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:bg-rose-500 hover:text-white transition-all"
+                 >
                     Delete Record
                  </button>
                  <button 

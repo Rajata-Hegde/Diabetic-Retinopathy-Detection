@@ -215,6 +215,18 @@ async def get_records():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/records/{record_id}")
+async def delete_record(record_id: str):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database disconnected")
+    try:
+        result = await db.diagnostics.delete_one({"_id": ObjectId(record_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Record not found")
+        return {"status": "success", "message": "Record deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
     if model is None and not load_model():
