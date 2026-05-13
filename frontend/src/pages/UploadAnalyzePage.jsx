@@ -80,7 +80,20 @@ function UploadAnalyzePage({ onScanComplete }) {
 
   const printToPDF = () => {
     const printWindow = window.open('', '_blank');
-    const auditHtml = (result.interpretation.clinical_audit || "").split('\n').map(line => `<li>${line}</li>`).join('');
+    
+    const pdfFormat = (text) => {
+        if (!text) return "";
+        return text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
+    };
+
+    const auditHtml = (result.interpretation.clinical_audit || "").split('\n').map(line => {
+        if (!line.trim()) return '';
+        const parts = line.split(':');
+        if (parts.length > 1) {
+            return `<li><span style="color: #0ea5e9; font-weight: 800;">${parts[0]}:</span> ${parts.slice(1).join(':')}</li>`;
+        }
+        return `<li>${line}</li>`;
+    }).join('');
 
     const html = `
       <html>
@@ -133,7 +146,7 @@ function UploadAnalyzePage({ onScanComplete }) {
           <div class="section">
             <div class="section-title">Patient Narrative</div>
             <div class="patient-note">
-              ${result.interpretation.patient_report?.replace(/\n/g, '<br>') || 'Awaiting interpretation...'}
+              ${pdfFormat(result.interpretation.patient_report)}
             </div>
           </div>
 
@@ -141,7 +154,12 @@ function UploadAnalyzePage({ onScanComplete }) {
             RetinaCare AI Diagnostic Suite • Confidential Medical Document • ${new Date().toLocaleString()}
           </div>
 
-          <script>window.print();</script>
+          <script>
+            window.onload = () => {
+                window.print();
+                setTimeout(() => window.close(), 500);
+            };
+          </script>
         </body>
       </html>
     `;
