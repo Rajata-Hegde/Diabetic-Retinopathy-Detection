@@ -1,80 +1,64 @@
-import { useEffect, useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ScanSearch, Upload, Activity, ShieldCheck, Zap, ArrowUpRight, CheckCircle2, AlertCircle, Download, Eye, FileText, ClipboardCheck, Printer, FileType } from 'lucide-react'
+import { Upload, X, Shield, Activity, FileText, Zap, ChevronRight, Hash, Printer, Download, Sparkles, BrainCircuit, Globe, RefreshCcw, ArrowRight } from 'lucide-react'
+import { useDropzone } from 'react-dropzone'
 
 function UploadAnalyzePage({ onScanComplete }) {
-  const [previewImage, setPreviewImage] = useState('')
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [activeXai, setActiveXai] = useState('none')
-  const [result, setResult] = useState({
-    grade: 0,
-    confidence: 0,
-    risk: 'Low',
-    explanations: { gradcam: null, lime: null, shap: null, consensus: null },
-    interpretation: {
-      summary: "",
-      clinical_audit: "",
-      patient_report: "",
-      agreement_score: 0,
-      methods_available: []
-    }
+  const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [result, setResult] = useState(null)
+  const [activeXai, setActiveXai] = useState('consensus')
+
+  const onDrop = useCallback(acceptedFiles => {
+    const selectedFile = acceptedFiles[0]
+    setFile(selectedFile)
+    setPreview(URL.createObjectURL(selectedFile))
+  }, [])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+    onDrop, 
+    accept: {'image/*': []},
+    multiple: false 
   })
-  const [reportTab, setReportTab] = useState('patient')
-  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    return () => {
-      if (previewImage) URL.revokeObjectURL(previewImage)
-    }
-  }, [previewImage])
-
-  const uploadFile = (file) => {
-    if (!file || !['image/jpeg', 'image/png'].includes(file.type)) return
-    if (previewImage) URL.revokeObjectURL(previewImage)
-    setPreviewImage(URL.createObjectURL(file))
-    setSelectedFile(file)
-    setError(null)
+  const reset = () => {
+    setFile(null)
+    setPreview(null)
+    setResult(null)
+    setAnalyzing(false)
   }
 
   const handleAnalyze = async () => {
-    if (!selectedFile) return
-    setIsAnalyzing(true)
-    setError(null)
+    if (!file) return
+    setAnalyzing(true)
+    
+    const formData = new FormData()
+    formData.append('file', file)
 
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      const response = await fetch('http://localhost:8000/analyze', { method: 'POST', body: formData })
-
-      if (!response.ok) throw new Error('Analysis engine unavailable')
+      const response = await fetch('http://localhost:8000/analyze', {
+        method: 'POST',
+        body: formData
+      })
       const data = await response.json()
-
-      if (data && typeof data.grade === 'number') {
-        const { grade, confidence, explanations, interpretation } = data
-        const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
-
-        const res = { grade, confidence, risk, explanations, interpretation }
-        setResult(res)
-        setActiveXai('gradcam')
-
-        if (onScanComplete) {
-          onScanComplete({
-            id: `PAT-${Math.floor(Math.random() * 90000) + 10000}`,
-            name: "New Patient Scan",
-            age: "--",
-            lastScan: new Date().toLocaleDateString(),
-            grade,
-            risk,
-            timeline: ["Screening performed via AI Neural Bridge"]
-          })
-        }
+      setResult(data)
+      
+      // Update global state
+      if (onScanComplete) {
+        onScanComplete({
+          id: data.id,
+          name: file.name.split('.')[0],
+          lastScan: new Date().toISOString().split('T')[0],
+          grade: data.grade,
+          risk: data.risk,
+          ...data
+        })
       }
     } catch (err) {
-      setError(err.message)
+      console.error("Analysis failed:", err)
     } finally {
-      setIsAnalyzing(false)
+      setAnalyzing(false)
     }
   }
 
@@ -180,272 +164,199 @@ function UploadAnalyzePage({ onScanComplete }) {
     return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
   }
 
-  const renderExpertAudit = () => {
-    const auditText = result.interpretation.clinical_audit || ""
-    const lines = auditText.split('\n').filter(l => l.includes(':'))
-
-    if (lines.length === 0) {
-      return (
-        <div className="p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
-          <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">
-            {formatText(auditText) || "Generating technical audit parameters..."}
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {lines.map((line, i) => {
-          const parts = line.split(':')
-          const k = parts[0]
-          const v = parts.slice(1).join(':')
-          return (
-            <div key={i} className="flex flex-col gap-2 p-5 rounded-3xl bg-indigo-500/5 border border-indigo-500/10 hover:border-indigo-500/30 transition-all group">
-              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-indigo-500/10 pb-2 mb-1 group-hover:text-indigo-300 transition-colors">
-                {k.trim().replace(/^[*-]\s*/, '')}
-              </span>
-              <span className="text-sm font-mono text-slate-200 font-bold leading-tight">
-                {formatText(v.trim())}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-10">
-      <div className="grid gap-10 lg:grid-cols-5">
-        {/* Step 1: Source Intake */}
-        <div className="lg:col-span-2 space-y-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="premium-glass p-10 rounded-[48px] border border-white/5 h-full flex flex-col"
-          >
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-white tracking-tight">Source Intake</h3>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">Step 01: Retinal Fundus</p>
-              </div>
-              <div className="h-12 w-12 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-400">
-                <Upload size={24} />
-              </div>
-            </div>
-
-            <label
-              className={`group relative flex-1 flex flex-col items-center justify-center rounded-[32px] border-2 border-dashed p-8 text-center transition-all cursor-pointer overflow-hidden ${isDragging ? 'border-sky-500 bg-sky-500/10' : 'border-white/5 bg-black/20 hover:border-white/20'
-                }`}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); uploadFile(e.dataTransfer.files?.[0]) }}
-            >
-              <div className="relative z-10">
-                <div className="mx-auto mb-6 h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform">
-                  <Upload size={32} />
-                </div>
-                <p className="text-xl font-bold text-white tracking-tight">Deploy Data Source</p>
-                <p className="mt-2 text-sm text-slate-500 font-medium italic">Drop JPG/PNG or browse clinical files</p>
-              </div>
-              <input type="file" className="hidden" onChange={(e) => uploadFile(e.target.files?.[0])} />
-            </label>
-          </motion.div>
-        </div>
-
-        {/* Step 2: XAI Projection & Inference */}
-        <div className="lg:col-span-3 space-y-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="premium-glass p-10 rounded-[48px] border border-white/5"
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-white tracking-tight">XAI Projection</h3>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">Step 02: Neural Overlay</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 md:gap-8">
-                {/* FIXED: Single line formatting for Grade and Confidence */}
-                <div className="flex items-center gap-4 px-6 border-r border-white/10">
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Grade:</span>
-                    <span className="text-2xl font-black text-white leading-none">0{result.grade}</span>
-                  </div>
-                  <div className="flex items-center gap-2 whitespace-nowrap ml-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Confidence:</span>
-                    <span className="text-2xl font-black text-sky-400 leading-none">{result.confidence}%</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleAnalyze}
-                  disabled={!previewImage || isAnalyzing}
-                  className="h-12 px-10 rounded-2xl bg-sky-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 disabled:opacity-30 disabled:hover:bg-sky-500 transition-all shadow-xl shadow-sky-500/20 active:scale-95 whitespace-nowrap"
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyse'}
-                </button>
-              </div>
-            </div>
-
-            <div className="relative h-[500px] w-full rounded-[32px] border border-white/10 bg-black/80 overflow-hidden group flex items-center justify-center">
-              {previewImage ? (
-                <>
-                  <img
-                    src={previewImage}
-                    alt="Input"
-                    className="h-full w-full object-contain transition-transform duration-700"
-                  />
-                  <AnimatePresence>
-                    {activeXai !== 'none' && result?.explanations?.[activeXai] && (
-                      <motion.img
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        src={`data:image/jpeg;base64,${result.explanations[activeXai]}`}
-                        className={`absolute inset-0 h-full w-full object-contain pointer-events-none ${activeXai === 'lime' ? '' : 'opacity-80 mix-blend-screen'}`}
-                      />
-                    )}
-                  </AnimatePresence>
-
-                  {isAnalyzing && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="h-16 w-16 rounded-full border-2 border-sky-500/20 border-t-sky-500"
-                      />
-                      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.3em] text-sky-400 animate-pulse">Running Neural Consensus...</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="flex h-full items-center justify-center flex-col text-slate-700 gap-4">
-                  <ScanSearch size={48} className="opacity-10" />
-                  <p className="text-xs font-black uppercase tracking-widest opacity-20">Input Required</p>
-                </div>
-              )}
-            </div>
-
-            {result?.explanations?.gradcam && (
-              <div className="mt-8 flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                {['none', 'gradcam', 'lime', 'shap', 'consensus'].map((id) => (
-                  <button
-                    key={id}
-                    onClick={() => setActiveXai(id)}
-                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeXai === id
-                      ? 'bg-sky-500 border-sky-400 text-white shadow-lg shadow-sky-500/20'
-                      : 'bg-white/5 border-white/5 text-slate-500 hover:text-white hover:bg-white/10'
-                      }`}
-                  >
-                    {id === 'none' ? 'Clean Input' : id === 'consensus' ? '🎯 Consensus' : id}
-                  </button>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        </div>
+    <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
+      {/* Background Layer */}
+      <div className="absolute inset-0 z-0">
+         <img 
+          src="/assets/upload_bg.png" 
+          className="h-full w-full object-cover opacity-40 scale-105 group-hover:scale-100 transition-transform duration-[10s]" 
+          alt="Futuristic Background"
+         />
+         <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/80 to-[#020617]/40" />
       </div>
 
-      {/* Step 3: Interpretation & Report */}
-      <AnimatePresence>
-        {result.interpretation.summary && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="premium-glass p-10 rounded-[48px] border border-white/5"
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-              <div>
-                <h3 className="text-2xl font-black text-white tracking-tight">Clinical Interpretation</h3>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">Multi-Modal Consensus Report</p>
-              </div>
+      <div className="relative z-10 p-12">
+        <AnimatePresence mode="wait">
+          {!result ? (
+            <motion.div
+              key="uploader"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto"
+            >
+               <div className="text-center mb-12">
+                  <h2 className="text-5xl font-black text-white tracking-tighter mb-4">Neural Entry Point</h2>
+                  <p className="text-lg text-slate-400 font-medium max-w-xl mx-auto">
+                    Initiate a high-fidelity retinal analysis. Our multi-modal XAI ensemble will perform a deep-tissue audit of your fundus imaging.
+                  </p>
+               </div>
 
-              <div className="flex p-1 rounded-2xl bg-black/20 border border-white/5 min-w-[320px]">
-                {['patient', 'expert'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setReportTab(tab)}
-                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${reportTab === tab ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' : 'text-slate-500 hover:text-white'
-                      }`}
-                  >
-                    {tab === 'patient' ? 'Patient Summary' : 'Expert Audit'}
-                  </button>
-                ))}
-              </div>
+               <div className="grid gap-10 lg:grid-cols-2">
+                 <div {...getRootProps()} className={`relative aspect-square rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-12 overflow-hidden ${
+                   isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
+                 }`}>
+                   <input {...getInputProps()} />
+                   {preview ? (
+                     <img src={preview} className="h-full w-full object-contain" />
+                   ) : (
+                     <>
+                        <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center text-slate-500 mb-6">
+                           <Upload size={40} />
+                        </div>
+                        <p className="text-sm font-black uppercase tracking-widest text-slate-400">Drop fundus image here</p>
+                        <p className="mt-2 text-xs font-bold text-slate-600">Supported formats: JPEG, PNG</p>
+                     </>
+                   )}
+                 </div>
 
-              <button
-                onClick={printToPDF}
-                className="h-14 px-8 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all flex items-center gap-3 group"
-              >
-                <Printer size={18} className="group-hover:scale-110 transition-transform" />
-                Generate PDF Report
-              </button>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {reportTab === 'patient' ? (
-                <motion.div
-                  key="patient"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="space-y-6"
-                >
-                  <div className="p-10 rounded-[32px] bg-sky-500/5 border border-sky-500/10 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8 opacity-10">
-                      <Zap size={120} className="text-sky-400" />
+                 <div className="flex flex-col justify-center space-y-6">
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-xl">
+                       <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <Shield size={16} className="text-sky-400" />
+                          Diagnostic Protocols
+                       </h3>
+                       <ul className="space-y-4">
+                          {[
+                            'Real-time Severity Classification',
+                            'Neural Consensus (Grad-CAM/SHAP)',
+                            'Automated Clinical Audit Log',
+                            'End-to-End Cloud Archival'
+                          ].map((text, i) => (
+                            <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                               <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                               {text}
+                            </li>
+                          ))}
+                       </ul>
                     </div>
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-3 mb-6">
-                        <FileText size={20} className="text-sky-400" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Personalized Insights</span>
+
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={!file || analyzing}
+                      className="h-20 w-full rounded-[32px] bg-sky-500 text-white font-black text-lg tracking-tight hover:bg-sky-400 transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-4 shadow-xl shadow-sky-500/20"
+                    >
+                      {analyzing ? (
+                        <>
+                          <RefreshCcw size={24} className="animate-spin" />
+                          Calibrating Neural Net...
+                        </>
+                      ) : (
+                        <>
+                          Run Diagnostic Audit
+                          <ArrowRight size={24} />
+                        </>
+                      )}
+                    </button>
+                 </div>
+               </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="max-w-6xl mx-auto space-y-10"
+            >
+               {/* Analysis Header */}
+               <div className="flex items-center justify-between premium-glass p-8 rounded-[40px] border border-white/10">
+                  <div className="flex items-center gap-6">
+                    <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                      <Zap size={32} />
+                    </div>
+                    <div>
+                      <h3 className="text-3xl font-black text-white tracking-tight">Diagnostic Verdict</h3>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Sequence ID: {result.id}</span>
+                        <span className="h-1 w-1 rounded-full bg-slate-700" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Scan Finalized</span>
                       </div>
-                      <div className="text-lg leading-relaxed text-slate-200 font-medium whitespace-pre-wrap max-w-4xl">
-                        {formatText(result.interpretation.patient_report)}
-                      </div>
                     </div>
                   </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="expert"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="space-y-10"
-                >
-                  <div className="p-10 rounded-[32px] bg-indigo-500/5 border border-indigo-500/10">
-                    <div className="flex items-center gap-3 mb-10">
-                      <ClipboardCheck size={20} className="text-indigo-400" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Clinical Verification Parameters</span>
-                    </div>
-                    {renderExpertAudit()}
+                  <div className="flex gap-4">
+                     <button 
+                      onClick={printToPDF}
+                      className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 flex items-center gap-2"
+                     >
+                        <Printer size={16} />
+                        PDF Report
+                     </button>
+                     <button onClick={reset} className="h-14 px-8 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all">
+                        Reset Terminal
+                     </button>
                   </div>
+               </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="p-6 rounded-3xl bg-white/5 border border-white/5">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Agreement</p>
-                      <p className="text-xl font-black text-emerald-400">{(result.interpretation.agreement_score * 100).toFixed(1)}%</p>
+               <div className="grid gap-10 lg:grid-cols-2">
+                 {/* Visual Evidence */}
+                 <div className="space-y-6">
+                   <div className="flex items-center justify-between">
+                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Forensic Neural Mapping</h4>
+                     <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/5">
+                        {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
+                          <button
+                            key={id}
+                            onClick={() => setActiveXai(id)}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-sky-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            {id}
+                          </button>
+                        ))}
+                     </div>
+                   </div>
+                   <div className="relative aspect-square rounded-[54px] bg-black border border-white/10 overflow-hidden shadow-2xl">
+                      {result.explanations?.[activeXai] ? (
+                        <img src={`data:image/jpeg;base64,${result.explanations[activeXai]}`} className="h-full w-full object-contain" />
+                      ) : (
+                        <div className="flex flex-col h-full items-center justify-center gap-4">
+                           <RefreshCcw size={32} className="text-slate-800 animate-spin" />
+                           <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Rendering Projection...</p>
+                        </div>
+                      )}
+                      <div className="absolute top-8 left-8 flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/10">
+                         <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                         <span className="text-[9px] font-black text-white uppercase tracking-widest">{activeXai} Layer</span>
+                      </div>
+                   </div>
+                 </div>
+
+                 {/* Report Content */}
+                 <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-4 text-sky-500/10">
+                             <Activity size={60} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Severity Grade</p>
+                          <h4 className="text-5xl font-black text-white tracking-tighter">{result.grade}</h4>
+                          <p className="text-[10px] font-bold text-sky-400 mt-2">Classified as {result.risk}</p>
+                       </div>
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-4 text-emerald-500/10">
+                             <Globe size={60} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">System Accuracy</p>
+                          <h4 className="text-5xl font-black text-white tracking-tighter">{result.confidence}%</h4>
+                          <p className="text-[10px] font-bold text-emerald-400 mt-2">Model Confidence</p>
+                       </div>
                     </div>
-                    <div className="p-6 rounded-3xl bg-white/5 border border-white/5">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Tier</p>
-                      <p className="text-xl font-black text-white">{result.risk}</p>
+
+                    <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden">
+                       <div className="flex items-center gap-3 mb-6">
+                          <Sparkles size={20} className="text-sky-400" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Clinical Narrative</span>
+                       </div>
+                       <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
+                          {formatText(result.interpretation.patient_report)}
+                       </div>
                     </div>
-                    <div className="col-span-2 p-6 rounded-3xl bg-white/5 border border-white/5">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Methods Synchronized</p>
-                      <p className="text-sm font-bold text-sky-400 truncate">{result.interpretation.methods_available?.join(' • ') || 'None'}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                 </div>
+               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
