@@ -18,6 +18,37 @@ import shap
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
+# AI Explanation Imports
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
+# Configure with version='v1' to avoid v1beta 404 issues
+# Configure with REST transport to avoid some gRPC 404/connection issues on Windows
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"), transport='rest')
+
+# Global variable to store discovered models
+AVAILABLE_MODELS = []
+
+def discover_models():
+    global AVAILABLE_MODELS
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("❌ No GEMINI_API_KEY found in .env")
+        return
+        
+    try:
+        print(f"Listing models with key: {api_key[:10]}...")
+        models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                models.append(m.name)
+        print(f"✅ Discovered {len(models)} Gemini models: {models}")
+        AVAILABLE_MODELS = models
+    except Exception as e:
+        print(f"⚠️ Could not list Gemini models: {type(e).__name__}: {e}")
+        AVAILABLE_MODELS = []
+
 app = FastAPI()
 
 # Enable CORS
@@ -28,8 +59,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_DIR = "ResNet50-APTOS-DR"
-MODEL_PATH = os.path.join(MODEL_DIR, "diabetic_retinopathy_full_model.pth") 
+# Use absolute path relative to this script's directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "ResNet50-APTOS-DR")
+MODEL_PATH = os.path.join(MODEL_DIR, "diabetic_retinopathy_full_model.pth")
 
 model = None
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -58,6 +91,7 @@ transform = transforms.Compose([
 @app.on_event("startup")
 async def startup_event():
     load_model()
+    discover_models()
 
 def get_lime_explanation(img_np, model, predicted_class):
     """Generates a LIME explanation for the image."""
@@ -213,6 +247,77 @@ def get_shap_explanation(input_tensor, model, predicted_class):
         
         # Return a blank mask instead of crashing
         return np.zeros((224, 224))
+
+def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, methods, agreement_score):
+    """
+    Uses Gemini 1.5 (Pro/Flash) to generate a dual-purpose explanation:
+    1. A professional Clinical Audit for doctors.
+    2. A plain-English Patient Report for non-medical users.
+    """
+    if not os.getenv("GEMINI_API_KEY"):
+        print("⚠️ Gemini API Key missing! Skipping AI explanation.")
+        return None
+        
+    prompt = f"""
+    You are a Senior Ophthalmic AI Specialist. 
+    Analyze the raw Retinal Image and the XAI Consensus Heatmap (which highlights model focus in red/yellow).
+
+    DIAGNOSTIC CONTEXT:
+    - AI Prediction: {grade_name}
+    - Confidence Score: {confidence:.1f}%
+    - Agreement Score: {agreement_score*100:.1f}%
+
+    YOUR TASK: Generate a high-utility, structured report.
+
+    PART 1: [CLINICAL_AUDIT]
+    Format: Use 'KEY: VALUE' pairs for each line.
+    Mandatory Keys:
+    - VALIDATION: (e.g., Confirmed/Suspicious/Noise)
+    - FOCUS_AREA: (e.g., Superior Periphery, Macular Region)
+    - PATHOLOGY_MATCH: (e.g., Hemorrhages detected in heatmap region)
+    - ARTIFACT_CHECK: (e.g., No interference from optic disc)
+    - RELIABILITY: (e.g., High/Moderate based on consensus)
+    - VERDICT: (Short clinical summary)
+
+    PART 2: [PATIENT_REPORT]
+    Tone: Empathetic, detailed, and specific. DO NOT be generic.
+    Goal: Help the patient understand THEIR specific eye.
+    Instructions:
+    1. VISUAL DESCRIPTION: Describe exactly WHERE the AI is looking in their eye (e.g., "the outer edges" or "near the center").
+    2. FINDING EXPLANATION: Explain the finding using a friendly analogy (e.g., "like small bruises on a fruit").
+    3. SEVERITY CONTEXT: Explain what '{grade_name}' means for their daily life (e.g., "This stage usually doesn't affect vision yet, but needs monitoring").
+    4. ACTIONABLE ADVICE: Give 2 specific questions they should ask their doctor at their next visit.
+    5. REASSURANCE: A supportive closing statement.
+
+    IMPORTANT: Maintain the [CLINICAL_AUDIT] and [PATIENT_REPORT] tags.
+    """
+
+    # Try discovered models first, then fallbacks
+    model_names = AVAILABLE_MODELS + ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision']
+    
+    # Remove 'models/' prefix if present for the loop, as SDK handles it
+    model_names = [m.replace('models/', '') for m in model_names]
+    # Remove duplicates but keep order
+    model_names = list(dict.fromkeys(model_names))
+
+    for model_name in model_names:
+        try:
+            print(f"Trying Gemini model: {model_name}...")
+            model_ai = genai.GenerativeModel(model_name)
+            
+            # Send both images if heatmap is available
+            content = [prompt, image_pil]
+            if heatmap_pil:
+                content.append(heatmap_pil)
+                
+            response = model_ai.generate_content(content)
+            return response.text.strip()
+        except Exception as e:
+            print(f"⚠️ {model_name} failed: {str(e)[:150]}...")
+            continue
+            
+    print("❌ All Gemini models failed.")
+    return None
 
 def encode_image(img_rgb):
     _, buffer = cv2.imencode('.jpg', cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))
@@ -372,8 +477,6 @@ async def analyze_image(file: UploadFile = File(...)):
                 combined_visualization = encode_image(consensus_viz)
                 
                 # Generate detailed consensus report
-                dr_grades = ["No DR", "Mild DR", "Moderate DR", "Severe DR", "Proliferative DR"]
-                grade_name = dr_grades[predicted_class] if predicted_class < 5 else "Unknown"
                 methods_str = ", ".join(available_methods)
                 
                 if len(available_methods) == 3:
@@ -410,11 +513,9 @@ Clinical Action: MODERATE CONFIDENCE. Recommend expert review."""
             except Exception as e:
                 print(f"Consensus calculation error: {e}")
                 consensus_report = f"Grade: {grade_name} (Confidence: {confidence*100:.1f}%)"
+                combined_visualization = None
         else:
             # Fallback when only 1 or 0 methods work
-            dr_grades = ["No DR", "Mild DR", "Moderate DR", "Severe DR", "Proliferative DR"]
-            grade_name = dr_grades[predicted_class] if predicted_class < 5 else "Unknown"
-            
             if len(available_methods) == 1:
                 consensus_report = f"""SINGLE XAI METHOD AVAILABLE:
 Grade: {grade_name} (Confidence: {confidence*100:.1f}%)
@@ -425,6 +526,46 @@ Clinical Action: Standard explanation only. Full multi-method consensus unavaila
 Grade: {grade_name} (Confidence: {confidence*100:.1f}%)
 Explainability analysis could not be performed.
 Clinical Action: Use primary model prediction with standard clinical review."""
+            
+            combined_visualization = None
+            agreement_score = 0
+
+        # Generate AI-powered clinical interpretation using Gemini
+        print("🤖 Generating AI Dual-Report via Gemini...")
+        
+        # Prepare consensus heatmap for Gemini if available
+        heatmap_pil = None
+        if combined_visualization:
+            # consensus_viz is the numpy array used for combined_visualization
+            heatmap_pil = Image.fromarray(consensus_viz)
+
+        ai_response = get_gemini_explanation(
+            image, 
+            heatmap_pil,
+            grade_name, 
+            confidence * 100, 
+            available_methods, 
+            agreement_score
+        )
+        
+        clinical_audit = ""
+        patient_report = ""
+
+        if ai_response:
+            print("✅ AI response generated. Parsing sections...")
+            # Simple parsing for the two sections
+            if "[CLINICAL_AUDIT]" in ai_response and "[PATIENT_REPORT]" in ai_response:
+                parts = ai_response.split("[PATIENT_REPORT]")
+                clinical_audit = parts[0].replace("[CLINICAL_AUDIT]", "").strip()
+                patient_report = parts[1].strip()
+            else:
+                clinical_audit = ai_response
+                patient_report = "Analysis complete. Please consult your physician for a plain-language explanation."
+        else:
+            clinical_audit = consensus_report
+            patient_report = "AI explanation service is currently unavailable. Please review the technical consensus below."
+
+        final_interpretation = f"{clinical_audit}\n\n--- TECHNICAL CONSENSUS ---\n{consensus_report}"
 
         # Print final summary
         print("\n" + "="*60)
@@ -447,7 +588,9 @@ Clinical Action: Use primary model prediction with standard clinical review."""
                 "consensus": combined_visualization
             },
             "interpretation": {
-                "summary": consensus_report.strip(),
+                "summary": final_interpretation.strip(),
+                "clinical_audit": clinical_audit.strip(),
+                "patient_report": patient_report.strip(),
                 "agreement_score": round(agreement_score, 3),
                 "methods_available": available_methods
             }
