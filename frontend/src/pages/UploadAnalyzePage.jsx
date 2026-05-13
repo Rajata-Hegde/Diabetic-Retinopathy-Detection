@@ -98,7 +98,7 @@ function UploadAnalyzePage({ onScanComplete }) {
     const html = `
       <html>
         <head>
-          <title>RetinaCare Clinical Report</title>
+          <title>DiabEyetic Insight Clinical Report</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
             body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
@@ -119,7 +119,7 @@ function UploadAnalyzePage({ onScanComplete }) {
         </head>
         <body>
           <div class="header">
-            <div class="logo">RetinaCare<span>.</span></div>
+            <div class="logo">DiabEyetic<span> Insight.</span></div>
             <div class="badge badge-risk">${result.risk} Risk Status</div>
           </div>
 
@@ -151,7 +151,7 @@ function UploadAnalyzePage({ onScanComplete }) {
           </div>
 
           <div class="footer">
-            RetinaCare AI Diagnostic Suite • Confidential Medical Document • ${new Date().toLocaleString()}
+            DiabEyetic Insight AI Diagnostic Suite • Confidential Medical Document • ${new Date().toLocaleString()}
           </div>
 
           <script>

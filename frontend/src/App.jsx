@@ -53,7 +53,7 @@ function App() {
     const today = new Date().toLocaleDateString()
     const todayScans = patientRecords.filter(r => r.lastScan === today).length
     const urgentCases = patientRecords.filter(r => r.risk === 'Critical' || r.risk === 'High').length
-    
+
     setAppStats([
       { title: 'Scans Today', value: todayScans.toString(), icon: UploadCloud },
       { title: 'High Risk Cases', value: urgentCases.toString(), icon: Bell },
@@ -70,7 +70,7 @@ function App() {
   ]
 
   const searchedRecords = useMemo(() => {
-    return patientRecords.filter((item) => 
+    return patientRecords.filter((item) =>
       `${item.id} ${item.name}`.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [searchTerm, patientRecords])
@@ -96,7 +96,7 @@ function App() {
     <div className="min-h-screen bg-[#020617] text-slate-100 selection:bg-sky-500/30">
       <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-black/20 backdrop-blur-2xl transition-all duration-500 xl:translate-x-0">
         <div className="flex h-full flex-col p-8">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="mb-12"
@@ -105,7 +105,7 @@ function App() {
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 shadow-lg shadow-sky-500/20 flex items-center justify-center">
                 <LayoutDashboard size={20} className="text-white" />
               </div>
-              <h1 className="text-2xl font-black tracking-tighter text-white">RetinaCare<span className="text-sky-500">.</span></h1>
+              <h1 className="text-2xl font-black tracking-tighter text-white">DiabEyetic<span className="text-sky-500"> Insight</span></h1>
             </div>
           </motion.div>
 
@@ -120,12 +120,11 @@ function App() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   onClick={() => setActivePage(item.key)}
-                  className={`group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-300 ${
-                    isActive ? 'bg-sky-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={`group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-300 ${isActive ? 'bg-sky-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    }`}
                 >
                   {isActive && (
-                    <motion.div 
+                    <motion.div
                       layoutId="nav-glow"
                       className="absolute inset-0 rounded-2xl bg-sky-500/5 shadow-[inset_0_0_20px_rgba(14,165,233,0.1)] border border-sky-500/20"
                     />
@@ -149,7 +148,7 @@ function App() {
                 ))}
               </div>
             </div>
-            
+
             <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
               <LogOut size={20} />
               <span className="font-bold tracking-tight text-sm">Sign Out</span>
@@ -168,14 +167,14 @@ function App() {
           <div className="flex items-center gap-6">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sky-400 transition-colors" size={18} />
-              <input 
+              <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Find diagnostic record..."
                 className="h-12 w-80 rounded-2xl bg-white/5 border border-white/5 pl-12 pr-6 text-sm font-medium text-white outline-none focus:border-sky-500/30 focus:bg-white/10 transition-all"
               />
             </div>
-            
+
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-white leading-none">Guest User</p>
@@ -200,10 +199,10 @@ function App() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             >
               {activePage === 'home' && (
-                <HomePage 
-                  onStartAnalysis={() => setActivePage('upload')} 
-                  onViewDashboard={() => setActivePage('dashboard')} 
-                  stats={appStats} 
+                <HomePage
+                  onStartAnalysis={() => setActivePage('upload')}
+                  onViewDashboard={() => setActivePage('dashboard')}
+                  stats={appStats}
                 />
               )}
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
