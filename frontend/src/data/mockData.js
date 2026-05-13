@@ -19,7 +19,7 @@ export const navItems = [
   { key: 'home', label: 'Home', icon: Home },
   { key: 'dashboard', label: 'Dashboard', icon: Activity },
   { key: 'upload', label: 'Upload & Analyze', icon: UploadCloud },
-  { key: 'records', label: 'Patient Records', icon: ClipboardList },
+  { key: 'records', label: 'Diagnostic Vault', icon: ClipboardList },
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
@@ -97,9 +97,9 @@ export const records = [
 
 export const summaryCards = [
   { title: 'Scans Today', value: '48', tone: 'blue', icon: Activity },
-  { title: 'Urgent Cases', value: '7', tone: 'red', icon: Gauge },
+  { title: 'Critical Findings', value: '7', tone: 'red', icon: Gauge },
   { title: 'Pending Review', value: '16', tone: 'amber', icon: ClipboardList },
-  { title: 'Active Patients', value: '1,284', tone: 'green', icon: UsersRound },
+  { title: 'Total Records', value: '1,284', tone: 'green', icon: UsersRound },
 ]
 
 export const weeklyScanData = [

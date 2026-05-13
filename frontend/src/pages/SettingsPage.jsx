@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Settings as SettingsIcon, Bell, Shield, Smartphone, Globe, Cloud, Database, Cpu, UserCircle, Key } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Shield, Smartphone, Globe, Cloud, Database, Cpu, UserCircle, Key, Activity, Heart } from 'lucide-react'
 
 function SettingsPage() {
   const container = {
@@ -17,30 +17,30 @@ function SettingsPage() {
 
   const sections = [
     {
-      title: 'Practitioner Profile',
-      icon: UserCircle,
+      title: 'Personal Health Profile',
+      icon: Heart,
       fields: [
-        { label: 'Clinician Name', value: 'Dr. Aryan Mehta' },
-        { label: 'Ophthalmology License', value: 'REG-99201-B' },
-        { label: 'Primary Clinic', value: 'Advanced Vision Center' }
+        { label: 'Patient Display Name', value: 'Guest User' },
+        { label: 'Preferred Language', value: 'English (Global)' },
+        { label: 'Health Data Region', value: 'India (South)' }
       ]
     },
     {
-      title: 'AI System Configuration',
+      title: 'AI Analysis Configuration',
       icon: Cpu,
       fields: [
-        { label: 'Confidence Threshold', value: '85%' },
-        { label: 'Ensemble Model', value: 'ResNet50-Committee v2' },
-        { label: 'Explainability Engine', value: 'Tri-Consensus (G+L+S)' }
+        { label: 'Analysis Sensitivity', value: 'High Precision' },
+        { label: 'Neural Bridge Version', value: 'RetinaCare-Core v2.4' },
+        { label: 'Explainability Mode', value: 'Patient-Friendly Visuals' }
       ]
     },
     {
-      title: 'Security & Encryption',
+      title: 'Privacy & Security',
       icon: Shield,
       fields: [
-        { label: 'Data Encryption', value: 'AES-256 GCM' },
-        { label: 'Local Persistence', value: 'Enabled' },
-        { label: 'HIPAA Compliance', value: 'Active-Verified' }
+        { label: 'Cloud Backup', value: 'End-to-End Encrypted' },
+        { label: 'Diagnostic History', value: 'Stored Locally' },
+        { label: 'Anonymous Usage', value: 'Enabled' }
       ]
     }
   ]
@@ -67,7 +67,7 @@ function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-white tracking-tight">{section.title}</h3>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">Workspace Configuration</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">General Preferences</p>
                 </div>
               </div>
 
@@ -89,10 +89,10 @@ function SettingsPage() {
             <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white mb-8 shadow-xl shadow-sky-500/20">
                <Key size={32} />
             </div>
-            <h3 className="text-2xl font-black text-white tracking-tight">API Management</h3>
-            <p className="text-sm leading-relaxed text-slate-400 mt-4 font-medium">Configure external intelligence endpoints and neural bridge connections.</p>
+            <h3 className="text-2xl font-black text-white tracking-tight">Access Control</h3>
+            <p className="text-sm leading-relaxed text-slate-400 mt-4 font-medium">Manage your personal API keys and external intelligence links for personalized health insights.</p>
             <button className="mt-8 h-14 w-full rounded-2xl bg-white text-black font-black text-sm uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all">
-               Link Endpoint
+               Update Credentials
             </button>
          </motion.div>
 
@@ -100,7 +100,7 @@ function SettingsPage() {
             <h3 className="text-xl font-black text-white tracking-tight">System Notification</h3>
             <div className="mt-8 space-y-6">
                {[
-                 { label: 'Critical Alerts', icon: Bell, active: true },
+                 { label: 'Health Alerts', icon: Bell, active: true },
                  { label: 'Cloud Sync', icon: Cloud, active: false },
                  { label: 'Offline Mode', icon: Database, active: true }
                ].map((toggle, i) => (

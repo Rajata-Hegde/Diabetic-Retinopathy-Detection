@@ -129,7 +129,7 @@ function App() {
         <header className="sticky top-0 z-40 flex items-center justify-between px-12 py-8 bg-[#020617]/80 backdrop-blur-md">
           <div>
             <h2 className="text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">Precision diagnostics for ophthalmology.</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">AI-powered retinal health screening for everyone.</p>
           </div>
 
           <div className="flex items-center gap-6">
@@ -138,15 +138,15 @@ function App() {
               <input 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Find patient record..."
+                placeholder="Find diagnostic record..."
                 className="h-12 w-80 rounded-2xl bg-white/5 border border-white/5 pl-12 pr-6 text-sm font-medium text-white outline-none focus:border-sky-500/30 focus:bg-white/10 transition-all"
               />
             </div>
             
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-white leading-none">Dr. Aryan Mehta</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Specialist</p>
+                <p className="text-sm font-bold text-white leading-none">Guest User</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Identity Verified</p>
               </div>
               <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 p-[2px]">
                 <div className="h-full w-full rounded-[14px] bg-slate-900 flex items-center justify-center overflow-hidden">
