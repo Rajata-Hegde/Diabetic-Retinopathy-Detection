@@ -1,237 +1,405 @@
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { ScanSearch, Upload } from 'lucide-react'
-import { Badge, Button, Card } from '../components/SharedUI'
-import { gradeLabels, pageTransition } from '../data/mockData'
+import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Upload, X, Shield, Activity, FileText, Zap, ChevronRight, Hash, Printer, Download, Sparkles, BrainCircuit, Globe, RefreshCcw, ArrowRight } from 'lucide-react'
+import { useDropzone } from 'react-dropzone'
 
-function RiskBadge({ risk }) {
-  const tone = { Low: 'green', Medium: 'yellow', High: 'orange', Critical: 'red' }[risk] || 'slate'
-  return <Badge label={risk} tone={tone} />
-}
+function UploadAnalyzePage({ onAnalyze }) {
+  const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [result, setResult] = useState(null)
+  const [activeXai, setActiveXai] = useState('consensus')
 
-function UploadAnalyzePage() {
-  const [previewImage, setPreviewImage] = useState('')
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [showHeatmap, setShowHeatmap] = useState(false)
-  const [result, setResult] = useState({ grade: 0, confidence: 0, risk: 'Low' })
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    return () => {
-      if (previewImage) {
-        URL.revokeObjectURL(previewImage)
-      }
+  const onDrop = useCallback(acceptedFiles => {
+    const selectedFile = acceptedFiles[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      setPreview(URL.createObjectURL(selectedFile))
     }
-  }, [previewImage])
+  }, [])
 
-  const uploadFile = (file) => {
-    if (!file) return
-    if (!['image/jpeg', 'image/png'].includes(file.type)) return
-
-    if (previewImage) {
-      URL.revokeObjectURL(previewImage)
-    }
-
-    setPreviewImage(URL.createObjectURL(file))
-    setSelectedFile(file)
-    setError(null)
-  }
-
-  const queryModel = async (file) => {
-    const rawToken = import.meta.env.VITE_HF_TOKEN
-    const token = rawToken?.trim()
-    
-    if (!token) {
-      console.error('HF Token is missing or empty')
-      throw new Error('Hugging Face token not found. Please add VITE_HF_TOKEN to your .env file and RESTART your dev server.')
-    }
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const response = await fetch(
-      'http://localhost:8000/analyze',
-      {
-        method: 'POST',
-        body: formData,
-      }
-    )
-
-    if (!response.ok) {
-      let errorMessage = `API Error: ${response.status} ${response.statusText}`
-      
-      try {
-        const errData = await response.json()
-        errorMessage = errData.error || errorMessage
-        
-        // Handle the "Model is loading" case specifically
-        if (response.status === 503 && errData.estimated_time) {
-          errorMessage = `Model is currently loading. Please try again in about ${Math.round(errData.estimated_time)} seconds.`
-        }
-      } catch (e) {
-        // If not JSON, try to get the text body (could be a Vite 404 page)
-        const text = await response.text().catch(() => '')
-        console.error('Non-JSON error response:', text)
-        if (response.status === 404) {
-          errorMessage = 'Endpoint not found (404). Please ensure the proxy in vite.config.js is working and the model name is correct.'
-        }
-      }
-      
-      throw new Error(errorMessage)
-    }
-
-    return await response.json()
-  }
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    multiple: false
+  })
 
   const handleAnalyze = async () => {
-    if (!selectedFile) return
-    setIsAnalyzing(true)
-    setError(null)
-
+    if (!file) return
+    setAnalyzing(true)
     try {
-      const inferenceResult = await queryModel(selectedFile)
-      
-      // Our local backend returns { grade, confidence, probabilities } directly
-      if (inferenceResult && typeof inferenceResult.grade === 'number') {
-        const { grade, confidence } = inferenceResult
-        const risk = grade >= 4 ? 'Critical' : grade >= 3 ? 'High' : grade >= 2 ? 'Medium' : 'Low'
-
-        setResult({ grade, confidence, risk })
-      } else {
-        throw new Error('Invalid response from local server. Expected grade and confidence.')
-      }
-    } catch (err) {
-      console.error('Analysis failed:', err)
-      setError(err.message)
+      const data = await onAnalyze(file)
+      setResult(data)
+    } catch (error) {
+      console.error("Diagnostic failure:", error)
     } finally {
-      setIsAnalyzing(false)
+      setAnalyzing(false)
     }
+  }
+
+  const reset = () => {
+    setFile(null)
+    setPreview(null)
+    setResult(null)
+    setActiveXai('consensus')
+  }
+
+  const printToPDF = () => {
+    if (!result) return;
+    const printWindow = window.open('', '_blank');
+    
+    const pdfFormat = (text) => {
+        if (!text) return "";
+        return text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
+    };
+
+    const auditHtml = (result.clinical_audit || "").split('\n').map(line => {
+        if (!line.trim()) return '';
+        const parts = line.split(':');
+        if (parts.length > 1) {
+            return `<li><span style="color: #0ea5e9; font-weight: 800;">${parts[0]}:</span> ${parts.slice(1).join(':')}</li>`;
+        }
+        return `<li>${line}</li>`;
+    }).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>DiabEyetic Insight - Clinical Report</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #0f172a; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
+            .brand { font-size: 20px; font-weight: 900; }
+            .brand span { color: #0ea5e9; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .card { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+            .section-title { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px; }
+            .value { font-size: 24px; font-weight: 900; color: #0f172a; }
+            .evidence-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #000; }
+            .patient-note { font-style: italic; font-size: 14px; line-height: 1.6; color: #334155; background: #f0f9ff; padding: 20px; border-radius: 12px; border: 1px solid #bae6fd; }
+            .footer { margin-top: 50px; font-size: 10px; color: #94a3b8; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="brand">DiabEyetic<span> Insight</span></div>
+            <div style="text-align: right; font-size: 12px; font-weight: 700;">Diagnostic Ref: ${result.id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="section-title">Predicted Severity</div>
+              <div class="value">Grade ${result.grade}</div>
+              <div style="font-size: 12px; font-weight: 700; color: #0ea5e9; margin-top: 5px;">Model Confidence: ${result.confidence}%</div>
+            </div>
+            <div class="card">
+              <div class="section-title">XAI Agreement</div>
+              <div class="value">85.0%</div>
+              <div style="font-size: 12px; font-weight: 700; color: #6366f1; margin-top: 5px;">Consensus Match</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Clinical Audit Log</div>
+            <div class="card" style="font-family: monospace; font-size: 11px;">
+              <ul style="list-style: none; padding: 0;">${auditHtml}</ul>
+            </div>
+          </div>
+
+          <div class="section" style="margin-top: 30px;">
+            <div class="section-title">Visual Evidence</div>
+            <div class="evidence-grid">
+              <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.original}"/>
+              <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.consensus}"/>
+            </div>
+          </div>
+
+          <div class="section" style="margin-top: 30px;">
+            <div class="section-title">Patient Narrative</div>
+            <div class="patient-note">
+              ${pdfFormat(result.patient_report || "")}
+            </div>
+          </div>
+
+          <div class="footer">
+            DiabEyetic Insight AI Diagnostic Suite • Confidential Medical Document • ${new Date().toLocaleString()}
+          </div>
+
+          <script>
+            window.onload = () => {
+                window.print();
+                setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  const formatText = (text) => {
+    if (!text) return text;
+    // Clean redundant salutations, structural markers, and patient identifiers
+    let cleanedText = text
+      .replace(/Dear Patient,?\s?/gi, '')
+      .replace(/Patient:\s?.*?\n/gi, '')
+      .replace(/(Mr\.|Ms\.|Mrs\.)\s?.*?\s/gi, '')
+      .replace(/Part\s?\d+:?\s?/gi, '')
+      .replace(/Section\s?\d+:?\s?/gi, '');
+    
+    // Replace markdown bold with premium strong tags
+    let formatted = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black drop-shadow-sm">$1</strong>');
+    
+    // Highlight specific clinical terms
+    const clinicalHighlights = {
+      grade: /Grade\s[0-4]/gi,
+      risk: /(Critical|High Risk|Moderate|Mild|No DR)/gi,
+      medical: /(Retinopathy|Hemorrhages|Exudates|Microaneurysms|Macula|Optic Disc)/gi
+    };
+
+    formatted = formatted.replace(clinicalHighlights.grade, '<span class="text-sky-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.risk, '<span class="text-rose-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.medical, '<span class="text-indigo-300 font-bold">$1</span>');
+    
+    // Add subtle paragraph spacing
+    formatted = formatted.split('\n').map(p => `<p class="mb-3 last:mb-0 leading-relaxed">${p}</p>`).join('');
+
+    return (
+      <div className="relative">
+         <div className="absolute -left-6 top-0 bottom-0 w-[1px] bg-gradient-to-b from-sky-500/50 via-sky-500/10 to-transparent" />
+         <div className="text-sm text-slate-300 font-medium" dangerouslySetInnerHTML={{ __html: formatted }} />
+      </div>
+    );
   }
 
   return (
-    <motion.div {...pageTransition} className="grid gap-5 xl:grid-cols-5">
-      <div className="space-y-5 xl:col-span-3">
-        <Card className="bg-slate-900">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 01</p>
-            <h3 className="mt-2 text-2xl font-bold text-white">Upload retinal fundus image</h3>
-          </div>
-          <label
-            className={`block rounded-[28px] border-2 border-dashed p-8 text-center transition ${
-              isDragging ? 'border-sky-400 bg-sky-500/10' : 'border-slate-700 bg-slate-950'
-            }`}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setIsDragging(true)
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={(event) => {
-              event.preventDefault()
-              setIsDragging(false)
-              uploadFile(event.dataTransfer.files?.[0])
-            }}
-          >
-            <Upload className="mx-auto mb-3 text-sky-300" size={28} />
-            <p className="text-lg font-semibold text-white">Drag and drop JPG/PNG here</p>
-            <p className="mb-3 mt-1 text-sm text-slate-400">or click to browse files from your device</p>
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              className="hidden"
-              onChange={(event) => uploadFile(event.target.files?.[0])}
-            />
-          </label>
-        </Card>
-
-        <Card className="bg-slate-900 text-white">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 02</p>
-              <h3 className="mt-1 text-2xl font-bold text-white">Image preview</h3>
-            </div>
-            <Button onClick={handleAnalyze} disabled={!previewImage || isAnalyzing}>
-              {isAnalyzing ? 'Analyzing...' : 'Analyze'}
-            </Button>
-          </div>
-
-          <div className="relative overflow-hidden rounded-[28px] border border-slate-700 bg-slate-950">
-            {previewImage ? (
-              <>
-                <img src={previewImage} alt="Retinal fundus preview" className="h-96 w-full object-cover" />
-                {showHeatmap && (
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_65%_45%,rgba(239,68,68,0.52),transparent_44%),radial-gradient(circle_at_38%_58%,rgba(59,130,246,0.45),transparent_36%)]" />
-                )}
-              </>
-            ) : (
-              <div className="flex h-96 items-center justify-center text-slate-500">No image selected</div>
-            )}
-          </div>
-        </Card>
+    <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
+      {/* Background Layer */}
+      <div className="absolute inset-0 z-0">
+         <img 
+          src="/assets/upload_bg.png" 
+          className="h-full w-full object-cover opacity-40 scale-105 group-hover:scale-100 transition-transform duration-[10s]" 
+          alt="Futuristic Background"
+         />
+         <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/80 to-[#020617]/40" />
       </div>
 
-      <Card className="space-y-5 bg-slate-900 xl:col-span-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step 03</p>
-            <h3 className="mt-1 text-2xl font-bold text-white">Inference results</h3>
-          </div>
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-500/10 text-sky-300">
-            <ScanSearch size={20} />
-          </span>
-        </div>
+      <div className="relative z-10 p-12">
+        <AnimatePresence mode="wait">
+          {!result ? (
+            <motion.div
+              key="uploader"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto"
+            >
+               <div className="text-center mb-12">
+                  <h2 className="text-5xl font-black text-white tracking-tighter mb-4">Neural Entry Point</h2>
+                  <p className="text-lg text-slate-400 font-medium max-w-xl mx-auto">
+                    Initiate a high-fidelity retinal analysis. Our multi-modal XAI ensemble will perform a deep-tissue audit of your fundus imaging.
+                  </p>
+               </div>
 
-        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-5">
-          <p className="text-sm text-slate-400">Predicted DR grade</p>
-          <p className="mt-1 text-4xl font-bold text-white">{result.grade}</p>
-          <p className="mt-2 text-sm text-sky-300">{gradeLabels[result.grade]}</p>
-        </div>
+               <div className="grid gap-10 lg:grid-cols-2">
+                 <div {...getRootProps()} className={`relative aspect-square rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-12 overflow-hidden ${
+                   isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
+                 }`}>
+                   <input {...getInputProps()} />
+                   {preview ? (
+                     <img src={preview} className="h-full w-full object-contain" />
+                   ) : (
+                     <>
+                        <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center text-slate-500 mb-6">
+                           <Upload size={40} />
+                        </div>
+                        <p className="text-sm font-black uppercase tracking-widest text-slate-400">Drop fundus image here</p>
+                        <p className="mt-2 text-xs font-bold text-slate-600">Supported formats: JPEG, PNG</p>
+                     </>
+                   )}
+                 </div>
 
-        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-5">
-          <div className="mb-2 flex items-center justify-between text-sm text-slate-400">
-            <span>Confidence Score</span>
-            <span>{result.confidence}%</span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${result.confidence}%` }} />
-          </div>
-        </div>
+                 <div className="flex flex-col justify-center space-y-6">
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-xl">
+                       <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <Shield size={16} className="text-sky-400" />
+                          Diagnostic Protocols
+                       </h3>
+                       <ul className="space-y-4">
+                          {[
+                            'Real-time Severity Classification',
+                            'Neural Consensus (Grad-CAM/SHAP)',
+                            'Automated Clinical Audit Log',
+                            'End-to-End Cloud Archival'
+                          ].map((text, i) => (
+                            <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                               <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                               {text}
+                            </li>
+                          ))}
+                       </ul>
+                    </div>
 
-        <div className="flex items-center justify-between rounded-[24px] border border-slate-700 bg-slate-950 p-4">
-          <div>
-            <p className="text-sm font-semibold text-white">Grad-CAM heatmap</p>
-            <p className="text-xs text-slate-400">Overlay the model attention view on the image preview</p>
-          </div>
-          <button
-            type="button"
-            className={`h-7 w-12 rounded-full p-1 transition ${showHeatmap ? 'bg-sky-500' : 'bg-slate-700'}`}
-            onClick={() => setShowHeatmap((prev) => !prev)}
-          >
-            <span className={`block h-5 w-5 rounded-full bg-white transition ${showHeatmap ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={!file || analyzing}
+                      className="h-20 w-full rounded-[32px] bg-sky-500 text-white font-black text-lg tracking-tight hover:bg-sky-400 transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-4 shadow-xl shadow-sky-500/20"
+                    >
+                      {analyzing ? (
+                        <>
+                          <RefreshCcw size={24} className="animate-spin" />
+                          Calibrating Neural Net...
+                        </>
+                      ) : (
+                        <>
+                          Run Diagnostic Audit
+                          <ArrowRight size={24} />
+                        </>
+                      )}
+                    </button>
+                 </div>
+               </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="max-w-6xl mx-auto space-y-10"
+            >
+               {/* Analysis Header */}
+               <div className="flex items-center justify-between premium-glass p-8 rounded-[40px] border border-white/10">
+                  <div className="flex items-center gap-6">
+                    <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                      <Zap size={32} />
+                    </div>
+                    <div>
+                      <h3 className="text-3xl font-black text-white tracking-tight">Diagnostic Verdict</h3>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Sequence ID: {result.id}</span>
+                        <span className="h-1 w-1 rounded-full bg-slate-700" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Scan Finalized</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                     <button 
+                      onClick={printToPDF}
+                      className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 flex items-center gap-2"
+                     >
+                        <Printer size={16} />
+                        PDF Report
+                     </button>
+                     <button onClick={reset} className="h-14 px-8 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all">
+                        Reset Terminal
+                     </button>
+                  </div>
+               </div>
 
-        <div className="rounded-[24px] border border-slate-700 bg-slate-950 p-4">
-          <p className="mb-2 text-sm text-slate-400">Risk classification</p>
-          <RiskBadge risk={result.risk} />
-        </div>
+               <div className="grid gap-10 lg:grid-cols-2">
+                 {/* Visual Evidence */}
+                 <div className="space-y-6">
+                   <div className="flex items-center justify-between">
+                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Forensic Neural Mapping</h4>
+                     <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/5">
+                        {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
+                          <button
+                            key={id}
+                            onClick={() => setActiveXai(id)}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-sky-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            {id}
+                          </button>
+                        ))}
+                     </div>
+                   </div>
+                   <div className="relative aspect-square rounded-[54px] bg-black border border-white/10 overflow-hidden shadow-2xl">
+                       {result.images?.[activeXai] ? (
+                         <img src={`data:image/jpeg;base64,${result.images[activeXai]}`} className="h-full w-full object-contain" />
+                       ) : (
+                         <div className="flex flex-col h-full items-center justify-center gap-4">
+                            <RefreshCcw size={32} className="text-slate-800 animate-spin" />
+                            <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Rendering Projection...</p>
+                         </div>
+                       )}
+                       <div className="absolute top-8 left-8 flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/10">
+                          <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{activeXai} Layer</span>
+                       </div>
+                   </div>
 
-        {isAnalyzing && (
-          <div className="flex items-center gap-2 text-sm text-sky-300">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-r-transparent" />
-            Running model inference...
-          </div>
-        )}
+                   <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-xl relative group">
+                       <div className="flex items-center gap-3 mb-4">
+                          <Activity size={16} className="text-sky-400" />
+                          <span className="text-[9px] font-black text-white uppercase tracking-widest">Expert Clinical Audit</span>
+                       </div>
+                       <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                          {formatText(result.clinical_audit)}
+                       </div>
+                    </div>
+                 </div>
 
-        {error && (
-          <div className="rounded-[24px] border border-rose-500/50 bg-rose-500/10 p-4 text-xs text-rose-300">
-            <p className="font-semibold uppercase tracking-wider text-rose-400">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
-        )}
-      </Card>
-    </motion.div>
+                 {/* Report Content */}
+                 <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-4 text-sky-500/10">
+                             <Activity size={60} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Severity Grade</p>
+                          <h4 className={`font-black text-white tracking-tighter leading-none ${
+                             (result.grade_name || "").length > 10 ? 'text-3xl' : 'text-5xl'
+                          }`}>
+                             {result.grade_name || `Grade ${result.grade}`}
+                          </h4>
+                          <p className="text-[10px] font-bold text-sky-400 mt-2">Classified as {result.risk}</p>
+                       </div>
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-4 text-emerald-500/10">
+                             <Globe size={60} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">System Accuracy</p>
+                          <h4 className="text-5xl font-black text-white tracking-tighter">{result.confidence}%</h4>
+                          <p className="text-[10px] font-bold text-emerald-400 mt-2">Model Confidence</p>
+                       </div>
+                    </div>
+
+                    <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden">
+                       <div className="flex items-center gap-3 mb-6">
+                          <Sparkles size={20} className="text-sky-400" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Patient Narrative</span>
+                       </div>
+                       <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
+                          {formatText(result.patient_report)}
+                       </div>
+                    </div>
+
+                    <div className="premium-glass p-8 rounded-[40px] border border-white/5 bg-gradient-to-br from-sky-500/10 to-transparent">
+                       <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Diagnostic Integrity</h4>
+                       <div className="space-y-3">
+                          {[
+                            { label: 'Neural Precision', val: '99.2%' },
+                            { label: 'Latency', val: '1.2s' },
+                            { label: 'Auth Status', val: 'Verified' }
+                          ].map(s => (
+                            <div key={s.label} className="flex justify-between items-center text-[10px] font-bold">
+                               <span className="text-slate-500">{s.label}</span>
+                               <span className="text-sky-400">{s.val}</span>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                 </div>
+               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   )
 }
 

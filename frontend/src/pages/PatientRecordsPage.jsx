@@ -1,158 +1,407 @@
-import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Badge, Button, Card, TableHead } from '../components/SharedUI'
-import { pageTransition, records } from '../data/mockData'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Search, User, Calendar, ShieldAlert, Eye, FileText, Download, X, Hash, Activity, Printer, Sparkles, BrainCircuit, ShieldCheck, ChevronRight } from 'lucide-react'
 
-function RiskBadge({ risk }) {
-  const tone = { Low: 'green', Medium: 'yellow', High: 'orange', Critical: 'red' }[risk] || 'slate'
-  return <Badge label={risk} tone={tone} />
-}
+function PatientRecordsPage({ records, onDelete }) {
+  const [selectedRecord, setSelectedRecord] = useState(null)
+  const [filterRisk, setFilterRisk] = useState('All')
+  const [activeXai, setActiveXai] = useState('consensus')
 
-function DetailModal({ patient, onClose }) {
-  if (!patient) return null
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-xl rounded-[24px] border border-slate-700 bg-slate-900 p-6"
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h3 className="text-2xl font-semibold text-white">{patient.name}</h3>
-            <p className="text-sm text-slate-400">Patient ID: {patient.id}</p>
-          </div>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-        </div>
-
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Age</p><p className="text-lg font-semibold text-white">{patient.age}</p></Card>
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Grade</p><p className="text-lg font-semibold text-white">{patient.grade}</p></Card>
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Risk</p><RiskBadge risk={patient.risk} /></Card>
-        </div>
-
-        <Card className="bg-slate-950 p-4">
-          <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Scan History Timeline</h4>
-          <ol className="space-y-3">
-            {patient.timeline.map((item) => (
-              <li key={item} className="flex items-center gap-3 text-sm text-white/72">
-                <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
-                {item}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      </motion.div>
-    </div>
+  const filteredRecords = records.filter(r => 
+    filterRisk === 'All' ? true : r.risk === filterRisk
   )
-}
 
-function PatientRecordsPage() {
-  const [recordSearch, setRecordSearch] = useState('')
-  const [riskFilter, setRiskFilter] = useState('All')
-  const [page, setPage] = useState(1)
-  const [selectedPatient, setSelectedPatient] = useState(null)
-  const pageSize = 4
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  }
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((item) => {
-      const matchesSearch = `${item.id} ${item.name}`.toLowerCase().includes(recordSearch.toLowerCase())
-      const matchesFilter = riskFilter === 'All' || item.risk === riskFilter
-      return matchesSearch && matchesFilter
-    })
-  }, [recordSearch, riskFilter])
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  }
 
-  const paginatedRecords = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filteredRecords.slice(start, start + pageSize)
-  }, [page, filteredRecords])
+  const formatText = (text) => {
+    if (!text) return text;
+    // Clean redundant salutations, structural markers, and patient identifiers
+    let cleanedText = text
+      .replace(/Dear Patient,?\s?/gi, '')
+      .replace(/Patient:\s?.*?\n/gi, '')
+      .replace(/(Mr\.|Ms\.|Mrs\.)\s?.*?\s/gi, '')
+      .replace(/Part\s?\d+:?\s?/gi, '')
+      .replace(/Section\s?\d+:?\s?/gi, '');
+    
+    // Replace markdown bold with premium strong tags
+    let formatted = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black drop-shadow-sm">$1</strong>');
+    
+    // Highlight specific clinical terms
+    const clinicalHighlights = {
+      grade: /Grade\s[0-4]/gi,
+      risk: /(Critical|High Risk|Moderate|Mild|No DR)/gi,
+      medical: /(Retinopathy|Hemorrhages|Exudates|Microaneurysms|Macula|Optic Disc)/gi
+    };
 
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
+    formatted = formatted.replace(clinicalHighlights.grade, '<span class="text-sky-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.risk, '<span class="text-rose-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.medical, '<span class="text-indigo-300 font-bold">$1</span>');
+    
+    // Add subtle paragraph spacing
+    formatted = formatted.split('\n').map(p => `<p class="mb-3 last:mb-0 leading-relaxed">${p}</p>`).join('');
+
+    return (
+      <div className="relative">
+         <div className="absolute -left-6 top-0 bottom-0 w-[1px] bg-gradient-to-b from-sky-500/50 via-sky-500/10 to-transparent" />
+         <div className="text-sm text-slate-300 font-medium" dangerouslySetInnerHTML={{ __html: formatted }} />
+      </div>
+    );
+  }
+
+  const exportForensicPDF = (record) => {
+    const printWindow = window.open('', '_blank');
+    
+    const pdfFormat = (text) => {
+      if (!text) return "";
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/\n/g, '<br/>');
+    };
+
+    const auditHtml = (record.clinical_audit || "").split('\n').map(line => {
+      if (!line.trim()) return '';
+      const parts = line.split(':');
+      if (parts.length > 1) {
+        return `<li><span style="color: #0ea5e9; font-weight: 800;">${parts[0]}:</span> ${parts.slice(1).join(':')}</li>`;
+      }
+      return `<li>${line}</li>`;
+    }).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>DiabEyetic Insight - Forensic Report</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            body { font-family: 'Inter', sans-serif; background: #fff; padding: 0; margin: 0; color: #0f172a; }
+            .page { padding: 50px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #0f172a; padding-bottom: 20px; margin-bottom: 40px; }
+            .brand { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
+            .brand span { color: #0ea5e9; }
+            .meta { text-align: right; }
+            .meta-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b; }
+            .meta-value { font-size: 14px; font-weight: 700; }
+            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-bottom: 40px; }
+            .section { margin-bottom: 40px; }
+            .section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #0ea5e9; margin-bottom: 15px; border-left: 4px solid #0ea5e9; padding-left: 15px; }
+            .evidence-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .evidence-card { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #000; }
+            .evidence-label { padding: 8px; font-size: 10px; font-weight: 800; background: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; text-transform: uppercase; }
+            .audit-list { list-style: none; padding: 0; font-family: monospace; font-size: 11px; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+            .audit-list li { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; }
+            .narrative { font-size: 14px; line-height: 1.7; color: #334155; background: #f0f9ff; padding: 30px; border-radius: 16px; border: 1px solid #bae6fd; font-style: italic; }
+            .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="header">
+              <div class="brand">DiabEyetic<span> Insight</span></div>
+              <div class="meta">
+                <div class="meta-label">Diagnostic Sequence</div>
+                <div class="meta-value">${record.id}</div>
+                <div class="meta-label" style="margin-top: 10px;">Screening Date</div>
+                <div class="meta-value">${record.lastScan}</div>
+              </div>
+            </div>
+
+            <div class="grid">
+              <div>
+                <div class="section-title">Diagnostic Verdict</div>
+                <div style="font-size: 32px; font-weight: 900;">${record.grade_name || `Grade ${record.grade}`}</div>
+                <div style="color: #0ea5e9; font-weight: 700;">${record.confidence}% AI Confidence Consensus</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="section-title" style="border-left: 0; border-right: 4px solid #0ea5e9; padding-right: 15px;">Risk Assessment</div>
+                <div style="font-size: 24px; font-weight: 900; color: ${record.risk === 'Critical' ? '#ef4444' : record.risk === 'High' ? '#f97316' : '#10b981'}">${record.risk} Status</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Visual Evidence Vault</div>
+              <div class="evidence-grid">
+                <div class="evidence-card"><img class="evidence-img" src="data:image/jpeg;base64,${record.images?.original}"/><div class="evidence-label">Raw Fundus Image</div></div>
+                <div class="evidence-card"><img class="evidence-img" src="data:image/jpeg;base64,${record.images?.consensus}"/><div class="evidence-label">Consensus Neural Map</div></div>
+                <div class="evidence-card"><img class="evidence-img" src="data:image/jpeg;base64,${record.images?.gradcam}"/><div class="evidence-label">Grad-CAM Activation</div></div>
+                <div class="evidence-card"><img class="evidence-img" src="data:image/jpeg;base64,${record.images?.shap}"/><div class="evidence-label">SHAP Feature Attribution</div></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Clinical Audit Log</div>
+              <ul class="audit-list">${auditHtml}</ul>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Automated Clinical Narrative</div>
+              <div class="narrative">${pdfFormat(record.patient_report || "")}</div>
+            </div>
+
+            <div class="footer">
+              CONFIDENTIAL MEDICAL RECORD • GENERATED BY DIABEYETIC INSIGHT AI SUITE • NOT A REPLACEMENT FOR PROFESSIONAL CLINICAL ADVICE
+            </div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
 
   return (
-    <>
-      <motion.div {...pageTransition} className="space-y-5">
-        <Card className="bg-slate-900">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Case library</p>
-              <h3 className="mt-1 text-2xl font-bold text-white">Patient records</h3>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none ring-sky-300 focus:ring-2"
-                placeholder="Search by patient ID or name"
-                value={recordSearch}
-                onChange={(event) => {
-                  setRecordSearch(event.target.value)
-                  setPage(1)
-                }}
-              />
-              <select
-                className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none"
-                value={riskFilter}
-                onChange={(event) => {
-                  setRiskFilter(event.target.value)
-                  setPage(1)
-                }}
-              >
-                <option>All</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-                <option>Critical</option>
-              </select>
-            </div>
-          </div>
+    <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
+      {/* Background Layer */}
+      <div className="absolute inset-0 z-0">
+         <img 
+          src="/assets/vault_bg.png" 
+          className="h-full w-full object-cover opacity-30 scale-105" 
+          alt="Vault Background"
+         />
+         <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/90 to-[#020617]/50" />
+      </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <TableHead>Patient ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Last Scan Date</TableHead>
-                  <TableHead>DR Grade</TableHead>
-                  <TableHead>Risk Level</TableHead>
-                  <TableHead>Action</TableHead>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRecords.map((patient) => (
-                  <tr key={patient.id} className="border-b border-slate-800 text-white/72">
-                    <td className="px-3 py-3">{patient.id}</td>
-                    <td className="px-3 py-3 font-medium text-white">{patient.name}</td>
-                    <td className="px-3 py-3">{patient.age}</td>
-                    <td className="px-3 py-3 text-slate-400">{patient.lastScan}</td>
-                    <td className="px-3 py-3">{patient.grade}</td>
-                    <td className="px-3 py-3"><RiskBadge risk={patient.risk} /></td>
-                    <td className="px-3 py-3">
-                      <Button variant="ghost" className="text-xs" onClick={() => setSelectedPatient(patient)}>
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="relative z-10 p-12 space-y-10"
+      >
+        {/* Header & Filters */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+           <div>
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="h-1 w-8 rounded-full bg-emerald-500" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400">Archival Intelligence</span>
+              </div>
+              <h2 className="text-6xl font-black text-white tracking-tighter">Diagnostic Vault</h2>
+              <p className="mt-2 text-slate-400 font-medium">Historical diagnostic ledger with forensic multi-modal evidence.</p>
+           </div>
+           
+           <div className="flex items-center gap-3 p-2 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-xl">
+             {['All', 'Critical', 'High', 'Medium', 'Low'].map(risk => (
+               <button
+                 key={risk}
+                 onClick={() => setFilterRisk(risk)}
+                 className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterRisk === risk
+                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                     : 'text-slate-500 hover:text-white'
+                   }`}
+               >
+                 {risk}
+               </button>
+             ))}
+           </div>
+        </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-            <p>
-              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredRecords.length)} of {filteredRecords.length}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" disabled={page === 1} onClick={() => setPage((prev) => prev - 1)}>Prev</Button>
-              <Button variant="ghost" disabled={page === pageCount} onClick={() => setPage((prev) => prev + 1)}>Next</Button>
+        {/* Records Grid */}
+        <motion.div variants={container} className="grid gap-6">
+          {filteredRecords.length > 0 ? filteredRecords.map(record => (
+            <motion.div
+              key={record.id}
+              variants={item}
+              whileHover={{ x: 10 }}
+              onClick={() => setSelectedRecord(record)}
+              className="group premium-glass p-6 rounded-[32px] border border-white/5 flex items-center gap-8 cursor-pointer relative overflow-hidden backdrop-blur-3xl shadow-2xl"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              
+              <div className="relative z-10 h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400 border border-white/5 overflow-hidden">
+                {record.images?.original ? (
+                  <img src={`data:image/jpeg;base64,${record.images.original}`} className="h-full w-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                ) : (
+                  <User size={24} />
+                )}
+              </div>
+
+              <div className="relative z-10 flex-1 grid grid-cols-4 gap-8">
+                <div className="col-span-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Source Identifier</p>
+                  <h4 className="text-xl font-black text-white tracking-tight truncate">{record.name}</h4>
+                  <p className="text-[10px] font-bold text-slate-500">REF: {record.id?.substring(0, 8)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">AI Verdict</p>
+                  <p className="text-xl font-black text-white">{record.grade_name || `Grade ${record.grade}`}</p>
+                  <p className="text-[10px] font-bold text-emerald-400">{record.confidence}% Confidence</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Timestamp</p>
+                  <div className="flex items-center gap-2 mt-1">
+                     <Calendar size={12} className="text-slate-500" />
+                     <p className="text-sm font-bold text-slate-300">{record.lastScan}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Risk Tier</p>
+                  <span className={`inline-flex px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-lg ${record.risk === 'Critical' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-rose-500/10' :
+                      record.risk === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-400 shadow-orange-500/10' :
+                        'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-emerald-500/10'
+                    }`}>{record.risk}</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 h-12 w-12 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 transition-all">
+                <ChevronRight size={24} />
+              </div>
+            </motion.div>
+          )) : (
+            <div className="py-32 flex flex-col items-center justify-center text-center">
+              <div className="h-24 w-24 rounded-[40px] bg-white/5 border border-dashed border-white/10 flex items-center justify-center text-slate-700 mb-6">
+                <Hash size={40} />
+              </div>
+              <h4 className="text-2xl font-black text-slate-500 tracking-tight">No Diagnostic Artifacts</h4>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 mt-2 italic">Awaiting first diagnostic sequence for vault population</p>
             </div>
-          </div>
-        </Card>
+          )}
+        </motion.div>
       </motion.div>
 
-      <DetailModal patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
-    </>
+      {/* Record Inspection Modal */}
+      <AnimatePresence>
+        {selectedRecord && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 lg:p-20">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedRecord(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-6xl max-h-full overflow-hidden premium-glass rounded-[54px] border border-white/10 flex flex-col bg-[#020617]/60"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className={`h-16 w-16 rounded-3xl flex items-center justify-center text-white shadow-2xl ${selectedRecord.risk === 'Critical' ? 'bg-rose-500 shadow-rose-500/20' : 'bg-emerald-500 shadow-emerald-500/20'}`}>
+                    <ShieldAlert size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-black text-white tracking-tight">{selectedRecord.name}</h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Diagnostic Sequence Audit: {selectedRecord.id}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedRecord(null)}
+                  className="h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                <div className="grid gap-10 lg:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Forensic Evidence</h4>
+                      <div className="flex gap-2 p-1 rounded-xl bg-white/5">
+                        {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
+                          <button
+                            key={id}
+                            onClick={() => setActiveXai(id)}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-emerald-500 text-white' : 'text-slate-500'}`}
+                          >
+                            {id}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="aspect-square rounded-[48px] bg-black border border-white/10 overflow-hidden shadow-2xl relative group">
+                      <img src={`data:image/jpeg;base64,${selectedRecord.images?.[activeXai]}`} className="h-full w-full object-contain" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-8 flex items-end">
+                         <div className="flex items-center gap-3">
+                            <Eye size={20} className="text-emerald-400" />
+                            <span className="text-sm font-black text-white uppercase tracking-widest">{activeXai} Projection</span>
+                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Verdict</p>
+                          <h4 className={`font-black text-white leading-none ${
+                             (selectedRecord.grade_name || "").length > 10 ? 'text-2xl' : 'text-4xl'
+                          }`}>
+                             {selectedRecord.grade_name || `Grade ${selectedRecord.grade}`}
+                          </h4>
+                       </div>
+                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Confidence</p>
+                          <h4 className="text-4xl font-black text-emerald-400">{selectedRecord.confidence}%</h4>
+                       </div>
+                    </div>
+
+                    <div className="p-10 rounded-[48px] bg-emerald-500/5 border border-emerald-500/10 backdrop-blur-3xl">
+                       <div className="flex items-center gap-3 mb-6">
+                          <FileText size={20} className="text-emerald-400" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">Patient Narrative</span>
+                       </div>
+                       <div className="text-lg text-slate-300 leading-relaxed font-medium italic">
+                          {formatText(selectedRecord.patient_report)}
+                       </div>
+                    </div>
+
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative group">
+                       <div className="flex items-center gap-3 mb-4">
+                          <Activity size={16} className="text-emerald-400" />
+                          <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Audit Log</span>
+                       </div>
+                       <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                          {formatText(selectedRecord.clinical_audit)}
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-white/5 flex justify-end gap-4 bg-white/5 backdrop-blur-3xl">
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Confirm permanent deletion of this diagnostic record?")) {
+                      const success = await onDelete(selectedRecord.id)
+                      if (success) setSelectedRecord(null)
+                    }
+                  }}
+                  className="h-14 px-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:bg-rose-500 hover:text-white transition-all"
+                >
+                  Delete Archive
+                </button>
+                <button
+                  onClick={() => exportForensicPDF(selectedRecord)}
+                  className="h-14 px-10 rounded-2xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
+                >
+                  <Download size={16} />
+                  Forensic Export
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 

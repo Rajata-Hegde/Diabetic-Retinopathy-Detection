@@ -1,74 +1,145 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Button, Card } from '../components/SharedUI'
-import { pageTransition } from '../data/mockData'
+import { Bell, Shield, Cloud, Database, Cpu, Lock, Zap, Settings as SettingsIcon, BrainCircuit } from 'lucide-react'
 
 function SettingsPage() {
-  const [threshold, setThreshold] = useState(72)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const sections = [
+    {
+      title: 'AI Analysis Configuration',
+      icon: Cpu,
+      fields: [
+        { label: 'Analysis Sensitivity', value: 'High Precision' },
+        { label: 'Neural Bridge Version', value: 'DiabEyetic-Insight v2.4' },
+        { label: 'Explainability Mode', value: 'Patient-Friendly Visuals' }
+      ]
+    },
+    {
+      title: 'Privacy & Security',
+      icon: Shield,
+      fields: [
+        { label: 'Cloud Backup', value: 'End-to-End Encrypted' },
+        { label: 'Diagnostic History', value: 'Stored Locally' },
+        { label: 'Anonymous Usage', value: 'Enabled' }
+      ]
+    }
+  ]
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  }
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  }
 
   return (
-    <motion.div {...pageTransition} className="grid gap-5 xl:grid-cols-2">
-      <Card className="bg-slate-900">
-        <h3 className="mb-4 text-2xl font-semibold text-white">Model threshold</h3>
-        <p className="mb-4 text-sm text-slate-400">Adjust DR classification sensitivity threshold.</p>
-        <input
-          type="range"
-          min="50"
-          max="95"
-          value={threshold}
-          onChange={(event) => setThreshold(Number(event.target.value))}
-          className="w-full accent-sky-400"
-        />
-        <div className="mt-2 flex justify-between text-xs text-slate-500">
-          <span>50</span>
-          <span className="font-semibold text-sky-300">Current: {threshold}</span>
-          <span>95</span>
-        </div>
-      </Card>
+    <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
+      {/* Background Layer */}
+      <div className="absolute inset-0 z-0">
+         <img 
+          src="/assets/settings_bg.png" 
+          className="h-full w-full object-cover opacity-20 scale-105" 
+          alt="Settings Background"
+         />
+         <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/90 to-[#020617]/40" />
+      </div>
 
-      <Card className="bg-slate-900">
-        <h3 className="mb-4 text-2xl font-semibold text-white">Notification preferences</h3>
-        <div className="flex items-center justify-between rounded-[24px] border border-slate-700 bg-slate-950 p-4">
-          <div>
-            <p className="text-sm font-semibold text-white">Critical case alerts</p>
-            <p className="text-xs text-slate-400">Email + in-app alerts for high severity detections.</p>
-          </div>
-          <button
-            type="button"
-            className={`h-7 w-12 rounded-full p-1 transition ${notificationsEnabled ? 'bg-sky-500' : 'bg-slate-700'}`}
-            onClick={() => setNotificationsEnabled((prev) => !prev)}
-          >
-            <span className={`block h-5 w-5 rounded-full bg-white transition ${notificationsEnabled ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
-      </Card>
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="relative z-10 p-12 space-y-12"
+      >
+        {/* Header Section */}
+        <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <div>
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="h-1 w-8 rounded-full bg-sky-500" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-400">Core Configuration</span>
+              </div>
+              <h2 className="text-6xl font-black text-white tracking-tighter">System Settings</h2>
+              <p className="mt-2 text-slate-400 font-medium max-w-lg">Manage your AI diagnostic preferences and data persistence protocols.</p>
+           </div>
+           <div className="h-20 w-20 rounded-[32px] bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-2xl shadow-sky-500/10">
+              <SettingsIcon size={40} className="animate-[spin_10s_linear_infinite]" />
+           </div>
+        </motion.div>
 
-      <Card className="bg-slate-900 xl:col-span-2">
-        <h3 className="mb-4 text-2xl font-semibold text-white">Doctor profile</h3>
-        <form className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm text-slate-300">
-            Full Name
-            <input className="mt-1 w-full rounded-[18px] border border-slate-700 bg-slate-950 px-3 py-2.5 outline-none ring-sky-300 focus:ring-2" defaultValue="Dr. Aryan Mehta" />
-          </label>
-          <label className="text-sm text-slate-300">
-            Email
-            <input className="mt-1 w-full rounded-[18px] border border-slate-700 bg-slate-950 px-3 py-2.5 outline-none ring-sky-300 focus:ring-2" defaultValue="aryan.mehta@retinacare.ai" />
-          </label>
-          <label className="text-sm text-slate-300">
-            Specialization
-            <input className="mt-1 w-full rounded-[18px] border border-slate-700 bg-slate-950 px-3 py-2.5 outline-none ring-sky-300 focus:ring-2" defaultValue="Retina Specialist" />
-          </label>
-          <label className="text-sm text-slate-300">
-            Hospital
-            <input className="mt-1 w-full rounded-[18px] border border-slate-700 bg-slate-950 px-3 py-2.5 outline-none ring-sky-300 focus:ring-2" defaultValue="VisionPlus Medical Center" />
-          </label>
-          <div className="sm:col-span-2">
-            <Button type="button">Save Settings</Button>
+        <div className="grid gap-10 lg:grid-cols-2">
+          <div className="space-y-10">
+            {sections.map((section, idx) => {
+              const Icon = section.icon
+              return (
+                <motion.div 
+                  key={idx} 
+                  variants={item}
+                  className="premium-glass p-10 rounded-[48px] border border-white/5 backdrop-blur-3xl group"
+                >
+                  <div className="flex items-center gap-6 mb-10">
+                    <div className="h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-all duration-500">
+                      <Icon size={28} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white tracking-tight">{section.title}</h3>
+                  </div>
+
+                  <div className="space-y-6">
+                    {section.fields.map((field, fIdx) => (
+                      <div key={fIdx} className="flex items-center justify-between p-5 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group/field">
+                        <span className="text-xs font-bold text-slate-500 group-hover/field:text-slate-300 transition-colors uppercase tracking-widest">{field.label}</span>
+                        <span className="text-sm font-black text-sky-400 tracking-tight">{field.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
-        </form>
-      </Card>
-    </motion.div>
+
+          <div className="space-y-10">
+             <motion.div variants={item} className="premium-glass p-10 rounded-[48px] border border-white/5 backdrop-blur-3xl group">
+                <div className="flex items-center justify-between mb-10">
+                   <h3 className="text-2xl font-black text-white tracking-tight">System Sync</h3>
+                   <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active Pipeline</span>
+                   </div>
+                </div>
+                <div className="space-y-4">
+                   {[
+                     { label: 'Health Alerts', icon: Bell, active: true },
+                     { label: 'Cloud Mirror', icon: Cloud, active: false },
+                     { label: 'Vault Persistence', icon: Database, active: true }
+                   ].map((toggle, i) => (
+                     <div key={i} className="flex items-center justify-between p-6 rounded-[32px] bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer group/toggle">
+                        <div className="flex items-center gap-4">
+                           <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${toggle.active ? 'bg-sky-500/10 text-sky-400' : 'bg-slate-800 text-slate-500'}`}>
+                              <toggle.icon size={20} />
+                           </div>
+                           <span className="text-xs font-black text-slate-300 tracking-widest uppercase">{toggle.label}</span>
+                        </div>
+                        <div className={`h-6 w-12 rounded-full p-1.5 transition-all duration-500 ${toggle.active ? 'bg-sky-500 shadow-[0_0_15px_rgba(14,165,233,0.5)]' : 'bg-slate-800'}`}>
+                           <div className={`h-3 w-3 rounded-full bg-white transition-transform duration-500 ${toggle.active ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             </motion.div>
+
+             <motion.div variants={item} className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-xl flex flex-col items-center text-center">
+                <div className="h-16 w-16 rounded-3xl bg-sky-500/10 flex items-center justify-center text-sky-400 mb-6">
+                   <BrainCircuit size={32} />
+                </div>
+                <h4 className="text-xl font-black text-white tracking-tight">Neural Optimization</h4>
+                <p className="text-xs text-slate-500 mt-2 font-medium">Automatic calibration of the DiabEyetic Insight engine is currently enabled for high-fidelity diagnostics.</p>
+             </motion.div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   )
 }
 
