@@ -56,11 +56,10 @@ function App() {
                   key={item.key}
                   type="button"
                   onClick={() => setActivePage(item.key)}
-                  className={`group flex items-center gap-3 rounded-[24px] px-4 py-3 text-left text-sm transition-all duration-300 ${
-                    isActive
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`group flex items-center gap-3 rounded-[24px] px-4 py-3 text-left text-sm transition-all duration-300 ${isActive
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <span className={`grid h-10 w-10 place-items-center rounded-2xl ${isActive ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-400 group-hover:text-sky-300'}`}>
                     <Icon size={18} />
