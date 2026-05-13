@@ -1,158 +1,187 @@
-import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Badge, Button, Card, TableHead } from '../components/SharedUI'
-import { pageTransition, records } from '../data/mockData'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Search, Filter, MoreVertical, Eye, Calendar, User, ChevronRight, Hash, X, Download, ShieldAlert } from 'lucide-react'
 
-function RiskBadge({ risk }) {
-  const tone = { Low: 'green', Medium: 'yellow', High: 'orange', Critical: 'red' }[risk] || 'slate'
-  return <Badge label={risk} tone={tone} />
-}
-
-function DetailModal({ patient, onClose }) {
-  if (!patient) return null
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-xl rounded-[24px] border border-slate-700 bg-slate-900 p-6"
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h3 className="text-2xl font-semibold text-white">{patient.name}</h3>
-            <p className="text-sm text-slate-400">Patient ID: {patient.id}</p>
-          </div>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-        </div>
-
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Age</p><p className="text-lg font-semibold text-white">{patient.age}</p></Card>
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Grade</p><p className="text-lg font-semibold text-white">{patient.grade}</p></Card>
-          <Card className="bg-slate-950 p-3"><p className="text-xs text-slate-500">Risk</p><RiskBadge risk={patient.risk} /></Card>
-        </div>
-
-        <Card className="bg-slate-950 p-4">
-          <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Scan History Timeline</h4>
-          <ol className="space-y-3">
-            {patient.timeline.map((item) => (
-              <li key={item} className="flex items-center gap-3 text-sm text-white/72">
-                <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
-                {item}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      </motion.div>
-    </div>
-  )
-}
-
-function PatientRecordsPage() {
-  const [recordSearch, setRecordSearch] = useState('')
-  const [riskFilter, setRiskFilter] = useState('All')
-  const [page, setPage] = useState(1)
+function PatientRecordsPage({ records }) {
   const [selectedPatient, setSelectedPatient] = useState(null)
-  const pageSize = 4
+  const [filterRisk, setFilterRisk] = useState('All')
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((item) => {
-      const matchesSearch = `${item.id} ${item.name}`.toLowerCase().includes(recordSearch.toLowerCase())
-      const matchesFilter = riskFilter === 'All' || item.risk === riskFilter
-      return matchesSearch && matchesFilter
-    })
-  }, [recordSearch, riskFilter])
+  const filteredRecords = records.filter(r => 
+    filterRisk === 'All' ? true : r.risk === filterRisk
+  )
 
-  const paginatedRecords = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filteredRecords.slice(start, start + pageSize)
-  }, [page, filteredRecords])
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.04 }
+    }
+  }
 
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
+  const item = {
+    hidden: { opacity: 0, x: -10 },
+    show: { opacity: 1, x: 0 }
+  }
 
   return (
-    <>
-      <motion.div {...pageTransition} className="space-y-5">
-        <Card className="bg-slate-900">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Case library</p>
-              <h3 className="mt-1 text-2xl font-bold text-white">Patient records</h3>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none ring-sky-300 focus:ring-2"
-                placeholder="Search by patient ID or name"
-                value={recordSearch}
-                onChange={(event) => {
-                  setRecordSearch(event.target.value)
-                  setPage(1)
-                }}
-              />
-              <select
-                className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none"
-                value={riskFilter}
-                onChange={(event) => {
-                  setRiskFilter(event.target.value)
-                  setPage(1)
-                }}
-              >
-                <option>All</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-                <option>Critical</option>
-              </select>
-            </div>
-          </div>
+    <div className="space-y-8">
+      {/* Filters Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 premium-glass p-6 rounded-3xl border border-white/5">
+        <div className="flex items-center gap-2">
+          <Filter size={16} className="text-sky-400" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filter Risk</span>
+        </div>
+        <div className="flex gap-2">
+          {['All', 'Critical', 'High', 'Medium', 'Low'].map(risk => (
+            <button
+              key={risk}
+              onClick={() => setFilterRisk(risk)}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                filterRisk === risk 
+                ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' 
+                : 'bg-white/5 text-slate-400 hover:bg-white/10'
+              }`}
+            >
+              {risk}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <TableHead>Patient ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Last Scan Date</TableHead>
-                  <TableHead>DR Grade</TableHead>
-                  <TableHead>Risk Level</TableHead>
-                  <TableHead>Action</TableHead>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRecords.map((patient) => (
-                  <tr key={patient.id} className="border-b border-slate-800 text-white/72">
-                    <td className="px-3 py-3">{patient.id}</td>
-                    <td className="px-3 py-3 font-medium text-white">{patient.name}</td>
-                    <td className="px-3 py-3">{patient.age}</td>
-                    <td className="px-3 py-3 text-slate-400">{patient.lastScan}</td>
-                    <td className="px-3 py-3">{patient.grade}</td>
-                    <td className="px-3 py-3"><RiskBadge risk={patient.risk} /></td>
-                    <td className="px-3 py-3">
-                      <Button variant="ghost" className="text-xs" onClick={() => setSelectedPatient(patient)}>
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-            <p>
-              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredRecords.length)} of {filteredRecords.length}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" disabled={page === 1} onClick={() => setPage((prev) => prev - 1)}>Prev</Button>
-              <Button variant="ghost" disabled={page === pageCount} onClick={() => setPage((prev) => prev + 1)}>Next</Button>
+      {/* Records Table/Grid */}
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid gap-4"
+      >
+        {filteredRecords.length > 0 ? filteredRecords.map((record, i) => (
+          <motion.div
+            key={record.id}
+            variants={item}
+            onClick={() => setSelectedPatient(record)}
+            className="group premium-glass card-hover p-6 rounded-[32px] border border-white/5 flex items-center gap-8 cursor-pointer relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-sky-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            
+            <div className="relative z-10 h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-sky-400 border border-white/5">
+               <User size={24} />
             </div>
+
+            <div className="relative z-10 flex-1 grid grid-cols-4 gap-8">
+               <div className="col-span-1">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Identity</p>
+                 <h4 className="text-lg font-black text-white tracking-tight">{record.name}</h4>
+                 <p className="text-[10px] font-bold text-slate-500">{record.id}</p>
+               </div>
+               <div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Grade</p>
+                 <p className="text-lg font-black text-white">DR Grade {record.grade}</p>
+                 <p className="text-[10px] font-bold text-slate-500">ML Classification</p>
+               </div>
+               <div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Last Screen</p>
+                 <p className="text-sm font-bold text-slate-300">{record.lastScan}</p>
+               </div>
+               <div className="text-right">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Risk Status</p>
+                 <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                   record.risk === 'Critical' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 
+                   record.risk === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-400' : 
+                   'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                 }`}>{record.risk}</span>
+               </div>
+            </div>
+
+            <div className="relative z-10 h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-sky-400 group-hover:bg-sky-500/10 transition-all">
+               <ChevronRight size={20} />
+            </div>
+          </motion.div>
+        )) : (
+          <div className="flex flex-col items-center justify-center py-32 premium-glass rounded-[48px] border border-dashed border-white/10">
+             <div className="h-20 w-20 rounded-[32px] bg-white/5 flex items-center justify-center text-slate-700 mb-6">
+                <Hash size={32} />
+             </div>
+             <h4 className="text-xl font-bold text-slate-500 tracking-tight">No records found</h4>
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 mt-2">Adjust filters or start a new analysis</p>
           </div>
-        </Card>
+        )}
       </motion.div>
 
-      <DetailModal patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
-    </>
+      {/* Patient Detail Modal */}
+      <AnimatePresence>
+        {selectedPatient && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedPatient(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-4xl overflow-hidden rounded-[48px] bg-[#020617] border border-white/10 shadow-2xl"
+            >
+              <div className="flex flex-col lg:flex-row h-full max-h-[85vh]">
+                <div className="lg:w-1/3 bg-white/5 p-10 border-r border-white/5">
+                   <div className="h-24 w-24 rounded-[32px] bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center text-white mb-8">
+                      <User size={48} />
+                   </div>
+                   <h3 className="text-3xl font-black text-white tracking-tighter leading-none">{selectedPatient.name}</h3>
+                   <p className="text-[11px] font-black uppercase tracking-[0.3em] text-sky-400 mt-4">{selectedPatient.id}</p>
+                   
+                   <div className="mt-10 space-y-6">
+                      <div className="flex items-center gap-4 text-slate-400">
+                        <Calendar size={18} />
+                        <span className="text-sm font-medium">Last Visit: {selectedPatient.lastScan}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-slate-400">
+                        <ShieldAlert size={18} />
+                        <span className="text-sm font-medium">Risk Level: {selectedPatient.risk}</span>
+                      </div>
+                   </div>
+
+                   <button className="mt-12 w-full h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-sm font-bold text-white hover:bg-white/10 transition-all">
+                      <Download size={18} />
+                      Export Medical PDF
+                   </button>
+                </div>
+
+                <div className="flex-1 p-10 overflow-y-auto">
+                   <div className="flex items-center justify-between mb-8">
+                      <h4 className="text-xl font-black text-white uppercase tracking-widest">Clinical History</h4>
+                      <button 
+                        onClick={() => setSelectedPatient(null)}
+                        className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
+                   </div>
+
+                   <div className="space-y-6">
+                      {selectedPatient.timeline?.map((event, idx) => (
+                        <div key={idx} className="relative pl-8 pb-8 last:pb-0 border-l border-white/5">
+                           <div className="absolute left-[-5px] top-1 h-2 w-2 rounded-full bg-sky-500 ring-4 ring-sky-500/20" />
+                           <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{selectedPatient.lastScan}</p>
+                           <p className="text-sm leading-relaxed text-slate-300 font-medium">{event}</p>
+                        </div>
+                      ))}
+                      {!selectedPatient.timeline && (
+                        <div className="text-center py-12 opacity-30 italic text-slate-500">
+                           No prior timeline events recorded.
+                        </div>
+                      )}
+                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 

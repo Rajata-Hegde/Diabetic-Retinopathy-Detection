@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
-import { Bell, Search, UserRound } from 'lucide-react'
-import { navItems, records } from './data/mockData'
+import { useMemo, useState, useEffect } from 'react'
+import { Bell, Search, UserRound, LayoutDashboard, UploadCloud, BarChart3, LogOut } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { navItems } from './data/mockData'
 import HomePage from './pages/HomePage'
 import DashboardHome from './pages/DashboardHome'
 import UploadAnalyzePage from './pages/UploadAnalyzePage'
@@ -13,135 +14,175 @@ import './App.css'
 function App() {
   const [activePage, setActivePage] = useState('home')
   const [searchTerm, setSearchTerm] = useState('')
+  const [patientRecords, setPatientRecords] = useState([])
+  const [appStats, setAppStats] = useState([
+    { title: 'Scans Today', value: '0', icon: UploadCloud },
+    { title: 'High Risk Cases', value: '0', icon: Bell },
+    { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
+  ])
+
+  useEffect(() => {
+    const savedRecords = localStorage.getItem('retina_records')
+    if (savedRecords) {
+      setPatientRecords(JSON.parse(savedRecords))
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('retina_records', JSON.stringify(patientRecords))
+    const today = new Date().toLocaleDateString()
+    const todayScans = patientRecords.filter(r => r.lastScan === today).length
+    const urgentCases = patientRecords.filter(r => r.risk === 'Critical' || r.risk === 'High').length
+    
+    setAppStats([
+      { title: 'Scans Today', value: todayScans.toString(), icon: UploadCloud },
+      { title: 'High Risk Cases', value: urgentCases.toString(), icon: Bell },
+      { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
+    ])
+  }, [patientRecords])
 
   const pageTitle = navItems.find((item) => item.key === activePage)?.label ?? 'Dashboard'
+
   const quickStats = [
-    { label: 'Today', value: '48 scans' },
-    { label: 'Urgent', value: '7 cases' },
-    { label: 'Accuracy', value: '93.1%' },
+    { label: 'Live Activity', value: `${appStats[0].value} scans` },
+    { label: 'Priority', value: `${appStats[1].value} cases` },
+    { label: 'System HP', value: 'Stable' },
   ]
 
   const searchedRecords = useMemo(() => {
-    return records.filter((item) => `${item.id} ${item.name}`.toLowerCase().includes(searchTerm.toLowerCase()))
-  }, [searchTerm])
+    return patientRecords.filter((item) => 
+      `${item.id} ${item.name}`.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [searchTerm, patientRecords])
+
+  const addPatientRecord = (newRecord) => {
+    setPatientRecords(prev => [newRecord, ...prev])
+  }
 
   return (
-    <div className="app-shell min-h-screen overflow-hidden text-slate-100">
-      <div className="absolute inset-0 -z-10">
-        <div className="paper-noise" />
-        <div className="paper-grid" />
-        <div className="paper-orb one" />
-        <div className="paper-orb two" />
-      </div>
-
-      <aside className="fixed inset-x-0 top-0 z-30 border-b border-slate-800/90 bg-slate-950/95 backdrop-blur xl:inset-y-0 xl:left-0 xl:w-80 xl:border-b-0 xl:border-r xl:border-r-slate-800/90">
-        <div className="flex h-full flex-col gap-6 p-5 text-white xl:p-7">
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-sky-300/80">Diabetic Retinopathy Detection</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">RetinaCare</h1>
-              <p className="mt-2 max-w-[16rem] text-sm leading-6 text-slate-400">
-                A clean clinical workspace for screening, review, and patient monitoring.
-              </p>
+    <div className="min-h-screen bg-[#020617] text-slate-100 selection:bg-sky-500/30">
+      <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-black/20 backdrop-blur-2xl transition-all duration-500 xl:translate-x-0">
+        <div className="flex h-full flex-col p-8">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="mb-12"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 shadow-lg shadow-sky-500/20 flex items-center justify-center">
+                <LayoutDashboard size={20} className="text-white" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tighter text-white">RetinaCare<span className="text-sky-500">.</span></h1>
             </div>
-          </div>
+          </motion.div>
 
-          <nav className="grid grid-cols-2 gap-2 xl:grid-cols-1">
-            {navItems.map((item) => {
+          <nav className="flex-1 space-y-2">
+            {navItems.map((item, idx) => {
               const Icon = item.icon
               const isActive = activePage === item.key
-
               return (
-                <button
+                <motion.button
                   key={item.key}
-                  type="button"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
                   onClick={() => setActivePage(item.key)}
-                  className={`group flex items-center gap-3 rounded-[24px] px-4 py-3 text-left text-sm transition-all duration-300 ${isActive
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                    }`}
+                  className={`group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-300 ${
+                    isActive ? 'bg-sky-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
                 >
-                  <span className={`grid h-10 w-10 place-items-center rounded-2xl ${isActive ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-400 group-hover:text-sky-300'}`}>
-                    <Icon size={18} />
-                  </span>
-                  <div>
-                    <span className="block truncate font-semibold">{item.label}</span>
-                    <span className={`text-xs ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {item.key === 'home' ? 'Welcome overview' : item.key === 'upload' ? 'Analyze new scans' : 'Workspace module'}
-                    </span>
-                  </div>
-                </button>
+                  {isActive && (
+                    <motion.div 
+                      layoutId="nav-glow"
+                      className="absolute inset-0 rounded-2xl bg-sky-500/5 shadow-[inset_0_0_20px_rgba(14,165,233,0.1)] border border-sky-500/20"
+                    />
+                  )}
+                  <Icon size={20} className={`relative z-10 ${isActive ? 'text-sky-400' : 'group-hover:text-sky-300'}`} />
+                  <span className="relative z-10 font-bold tracking-tight">{item.label}</span>
+                </motion.button>
               )
             })}
           </nav>
 
-          <div className="mt-auto hidden rounded-[24px] border border-slate-800 bg-slate-900/80 p-5 xl:block">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Operations Pulse</p>
-            <div className="mt-4 space-y-3">
-              {quickStats.map((item) => (
-                <div key={item.label} className="flex items-center justify-between border-b border-dashed border-slate-800 pb-3 last:border-b-0 last:pb-0">
-                  <span className="text-sm text-slate-400">{item.label}</span>
-                  <span className="text-sm font-semibold text-white">{item.value}</span>
-                </div>
-              ))}
+          <div className="mt-auto space-y-6">
+            <div className="rounded-3xl bg-white/5 p-6 border border-white/5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Live Pulse</p>
+              <div className="mt-4 space-y-3">
+                {quickStats.map(stat => (
+                  <div key={stat.label} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">{stat.label}</span>
+                    <span className="text-xs font-bold text-sky-400">{stat.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
+            
+            <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
+              <LogOut size={20} />
+              <span className="font-bold tracking-tight text-sm">Sign Out</span>
+            </button>
           </div>
         </div>
       </aside>
 
-      <div className="px-4 pb-8 pt-48 xl:ml-80 xl:px-8 xl:pt-8">
-        <header className="mb-6 grid gap-4 rounded-[28px] border border-slate-800 bg-slate-900/90 p-6 xl:grid-cols-[1.3fr_1fr]">
-          <div className="relative">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">AI Assisted Ophthalmology</p>
-            <h2 className="mt-2 text-3xl font-bold text-white">{pageTitle}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Simple, readable clinical tooling for retinal screening and patient review.
-            </p>
+      <main className="min-h-screen xl:ml-72">
+        <header className="sticky top-0 z-40 flex items-center justify-between px-12 py-8 bg-[#020617]/80 backdrop-blur-md">
+          <div>
+            <h2 className="text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
+            <p className="mt-1 text-sm font-medium text-slate-500">Precision diagnostics for ophthalmology.</p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <label className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300">
-              <Search size={16} className="text-slate-500" />
-              <input
-                className="w-full bg-transparent text-white outline-none placeholder:text-slate-500 sm:w-56"
-                placeholder="Search patient"
+          <div className="flex items-center gap-6">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sky-400 transition-colors" size={18} />
+              <input 
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Find patient record..."
+                className="h-12 w-80 rounded-2xl bg-white/5 border border-white/5 pl-12 pr-6 text-sm font-medium text-white outline-none focus:border-sky-500/30 focus:bg-white/10 transition-all"
               />
-            </label>
-
-            <button type="button" className="relative rounded-full border border-slate-700 bg-slate-950 p-3 text-slate-200 transition-all duration-300 hover:bg-slate-900">
-              <Bell size={18} />
-              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500" />
-            </button>
-
-            <div className="flex items-center gap-3 rounded-full border border-slate-700 bg-slate-950 px-4 py-3">
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-sky-500 text-white">
-                <UserRound size={18} />
-              </span>
-              <div>
-                <p className="text-xs font-semibold text-white">Dr. Aryan Mehta</p>
-                <p className="text-[11px] text-slate-500">Retina Specialist</p>
+            </div>
+            
+            <div className="flex items-center gap-4 border-l border-white/10 pl-6">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-white leading-none">Dr. Aryan Mehta</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Specialist</p>
+              </div>
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 p-[2px]">
+                <div className="h-full w-full rounded-[14px] bg-slate-900 flex items-center justify-center overflow-hidden">
+                  <UserRound className="text-sky-400" size={20} />
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        {searchTerm && (
-          <div className="mb-5 rounded-[24px] border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-300">
-            Search results in records: <span className="font-semibold text-white">{searchedRecords.length}</span> match(es)
-          </div>
-        )}
+        <div className="px-12 pb-12">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activePage}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {activePage === 'home' && (
+                <HomePage 
+                  onStartAnalysis={() => setActivePage('upload')} 
+                  onViewDashboard={() => setActivePage('dashboard')} 
+                  stats={appStats} 
+                />
+              )}
+              {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
+              {activePage === 'upload' && <UploadAnalyzePage onScanComplete={addPatientRecord} />}
+              {activePage === 'records' && <PatientRecordsPage records={searchedRecords} />}
+              {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />}
+              {activePage === 'settings' && <SettingsPage />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
 
-        {activePage === 'home' && <HomePage />}
-        {activePage === 'dashboard' && <DashboardHome />}
-        {activePage === 'upload' && <UploadAnalyzePage />}
-        {activePage === 'records' && <PatientRecordsPage />}
-        {activePage === 'analytics' && <AnalyticsPage />}
-        {activePage === 'settings' && <SettingsPage />}
-      </div>
-
-      {/* Global floating chatbot — visible on every page */}
       <Chatbot />
     </div>
   )
