@@ -282,7 +282,7 @@ function UploadAnalyzePage({ onScanComplete }) {
                     className="h-full w-full object-contain transition-transform duration-700"
                   />
                   <AnimatePresence>
-                    {activeXai !== 'none' && result.explanations[activeXai] && (
+                    {activeXai !== 'none' && result?.explanations?.[activeXai] && (
                       <motion.img
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -312,7 +312,7 @@ function UploadAnalyzePage({ onScanComplete }) {
               )}
             </div>
 
-            {result.explanations.gradcam && (
+            {result?.explanations?.gradcam && (
               <div className="mt-8 flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                 {['none', 'gradcam', 'lime', 'shap', 'consensus'].map((id) => (
                   <button

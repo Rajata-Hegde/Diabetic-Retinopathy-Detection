@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Filter, MoreVertical, Eye, Calendar, User, ChevronRight, Hash, X, Download, ShieldAlert } from 'lucide-react'
+import { Search, Filter, MoreVertical, Eye, Calendar, User, ChevronRight, Hash, X, Download, ShieldAlert, Activity, FileText, Zap } from 'lucide-react'
 
 function PatientRecordsPage({ records }) {
-  const [selectedPatient, setSelectedPatient] = useState(null)
+  const [selectedRecord, setSelectedRecord] = useState(null)
   const [filterRisk, setFilterRisk] = useState('All')
+  const [activeXai, setActiveXai] = useState('consensus')
 
   const filteredRecords = records.filter(r => 
     filterRisk === 'All' ? true : r.risk === filterRisk
@@ -23,13 +24,25 @@ function PatientRecordsPage({ records }) {
     show: { opacity: 1, x: 0 }
   }
 
+  const formatText = (text) => {
+    if (!text) return text;
+    const boldTerms = ['Grade 0', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Critical', 'High Risk', 'Urgent', 'No DR', 'Severe', 'Moderate', 'Mild'];
+    let formatted = text;
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black">$1</strong>');
+    boldTerms.forEach(term => {
+      const reg = new RegExp(`(${term})`, 'gi');
+      formatted = formatted.replace(reg, '<strong class="text-sky-400 font-black">$1</strong>');
+    });
+    return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+  }
+
   return (
     <div className="space-y-8">
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 premium-glass p-6 rounded-3xl border border-white/5">
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-sky-400" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filter Risk</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filter Risk Status</span>
         </div>
         <div className="flex gap-2">
           {['All', 'Critical', 'High', 'Medium', 'Low'].map(risk => (
@@ -48,7 +61,7 @@ function PatientRecordsPage({ records }) {
         </div>
       </div>
 
-      {/* Records Table/Grid */}
+      {/* Records Grid */}
       <motion.div 
         variants={container}
         initial="hidden"
@@ -57,30 +70,34 @@ function PatientRecordsPage({ records }) {
       >
         {filteredRecords.length > 0 ? filteredRecords.map((record, i) => (
           <motion.div
-            key={record.id}
+            key={record.id || i}
             variants={item}
-            onClick={() => setSelectedPatient(record)}
+            onClick={() => setSelectedRecord(record)}
             className="group premium-glass card-hover p-6 rounded-[32px] border border-white/5 flex items-center gap-8 cursor-pointer relative overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-sky-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             
-            <div className="relative z-10 h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-sky-400 border border-white/5">
-               <User size={24} />
+            <div className="relative z-10 h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-sky-400 border border-white/5 overflow-hidden">
+               {record.images?.original ? (
+                 <img src={`data:image/jpeg;base64,${record.images.original}`} className="h-full w-full object-cover opacity-50" />
+               ) : (
+                 <User size={24} />
+               )}
             </div>
 
             <div className="relative z-10 flex-1 grid grid-cols-4 gap-8">
                <div className="col-span-1">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Identity</p>
-                 <h4 className="text-lg font-black text-white tracking-tight">{record.name}</h4>
-                 <p className="text-[10px] font-bold text-slate-500">{record.id}</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Source</p>
+                 <h4 className="text-lg font-black text-white tracking-tight truncate max-w-[200px]">{record.name}</h4>
+                 <p className="text-[10px] font-bold text-slate-500">ID: {record.id?.substring(0, 12)}...</p>
                </div>
                <div>
-                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Grade</p>
-                 <p className="text-lg font-black text-white">DR Grade {record.grade}</p>
-                 <p className="text-[10px] font-bold text-slate-500">ML Classification</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Diagnostic</p>
+                 <p className="text-lg font-black text-white">{record.grade_name || `Grade ${record.grade}`}</p>
+                 <p className="text-[10px] font-bold text-slate-500">{record.confidence}% Confidence</p>
                </div>
                <div>
-                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Last Screen</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Screening Date</p>
                  <p className="text-sm font-bold text-slate-300">{record.lastScan}</p>
                </div>
                <div className="text-right">
@@ -94,7 +111,7 @@ function PatientRecordsPage({ records }) {
             </div>
 
             <div className="relative z-10 h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-sky-400 group-hover:bg-sky-500/10 transition-all">
-               <ChevronRight size={20} />
+               <Eye size={20} />
             </div>
           </motion.div>
         )) : (
@@ -102,80 +119,108 @@ function PatientRecordsPage({ records }) {
              <div className="h-20 w-20 rounded-[32px] bg-white/5 flex items-center justify-center text-slate-700 mb-6">
                 <Hash size={32} />
              </div>
-             <h4 className="text-xl font-bold text-slate-500 tracking-tight">No records found</h4>
-             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 mt-2">Adjust filters or start a new analysis</p>
+             <h4 className="text-xl font-bold text-slate-500 tracking-tight">No diagnostic history found</h4>
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 mt-2">Initialize analysis to populate vault</p>
           </div>
         )}
       </motion.div>
 
-      {/* Patient Detail Modal */}
+      {/* Record Depth Modal */}
       <AnimatePresence>
-        {selectedPatient && (
+        {selectedRecord && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedPatient(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-xl"
+              onClick={() => setSelectedRecord(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-4xl overflow-hidden rounded-[48px] bg-[#020617] border border-white/10 shadow-2xl"
+              exit={{ opacity: 0, scale: 0.95, y: 40 }}
+              className="relative w-full max-w-6xl overflow-hidden rounded-[48px] bg-[#020617] border border-white/10 shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="flex flex-col lg:flex-row h-full max-h-[85vh]">
-                <div className="lg:w-1/3 bg-white/5 p-10 border-r border-white/5">
-                   <div className="h-24 w-24 rounded-[32px] bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center text-white mb-8">
-                      <User size={48} />
-                   </div>
-                   <h3 className="text-3xl font-black text-white tracking-tighter leading-none">{selectedPatient.name}</h3>
-                   <p className="text-[11px] font-black uppercase tracking-[0.3em] text-sky-400 mt-4">{selectedPatient.id}</p>
-                   
-                   <div className="mt-10 space-y-6">
-                      <div className="flex items-center gap-4 text-slate-400">
-                        <Calendar size={18} />
-                        <span className="text-sm font-medium">Last Visit: {selectedPatient.lastScan}</span>
-                      </div>
-                      <div className="flex items-center gap-4 text-slate-400">
-                        <ShieldAlert size={18} />
-                        <span className="text-sm font-medium">Risk Level: {selectedPatient.risk}</span>
-                      </div>
-                   </div>
-
-                   <button className="mt-12 w-full h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-sm font-bold text-white hover:bg-white/10 transition-all">
-                      <Download size={18} />
-                      Export Medical PDF
-                   </button>
+              {/* Header */}
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-6">
+                  <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                    <Activity size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-black text-white tracking-tight">{selectedRecord.name}</h3>
+                    <div className="flex items-center gap-4 mt-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Scan ID: {selectedRecord.id}</span>
+                      <span className="text-slate-600">•</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{selectedRecord.lastScan}</span>
+                    </div>
+                  </div>
                 </div>
+                <button onClick={() => setSelectedRecord(null)} className="h-12 w-12 rounded-2xl bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-all">
+                  <X size={24} />
+                </button>
+              </div>
 
-                <div className="flex-1 p-10 overflow-y-auto">
-                   <div className="flex items-center justify-between mb-8">
-                      <h4 className="text-xl font-black text-white uppercase tracking-widest">Clinical History</h4>
-                      <button 
-                        onClick={() => setSelectedPatient(null)}
-                        className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors"
-                      >
-                        <X size={20} />
-                      </button>
-                   </div>
-
-                   <div className="space-y-6">
-                      {selectedPatient.timeline?.map((event, idx) => (
-                        <div key={idx} className="relative pl-8 pb-8 last:pb-0 border-l border-white/5">
-                           <div className="absolute left-[-5px] top-1 h-2 w-2 rounded-full bg-sky-500 ring-4 ring-sky-500/20" />
-                           <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{selectedPatient.lastScan}</p>
-                           <p className="text-sm leading-relaxed text-slate-300 font-medium">{event}</p>
-                        </div>
+              <div className="flex-1 overflow-y-auto p-10 grid gap-10 lg:grid-cols-2">
+                {/* Visual Evidence */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-black text-white uppercase tracking-widest">Neural Projection History</h4>
+                    <div className="flex gap-2 p-1 rounded-xl bg-white/5 border border-white/5">
+                      {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
+                        <button 
+                          key={id}
+                          onClick={() => setActiveXai(id)}
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-sky-500 text-white' : 'text-slate-500'}`}
+                        >
+                          {id}
+                        </button>
                       ))}
-                      {!selectedPatient.timeline && (
-                        <div className="text-center py-12 opacity-30 italic text-slate-500">
-                           No prior timeline events recorded.
-                        </div>
-                      )}
-                   </div>
+                    </div>
+                  </div>
+                  <div className="relative aspect-square rounded-[40px] bg-black border border-white/5 overflow-hidden group">
+                    {selectedRecord.images?.[activeXai] ? (
+                      <img src={`data:image/jpeg;base64,${selectedRecord.images[activeXai]}`} className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center opacity-20 italic text-slate-500">Image data unavailable</div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Report Content */}
+                <div className="space-y-8">
+                  <div className="p-8 rounded-[40px] bg-sky-500/5 border border-sky-500/10">
+                    <div className="flex items-center gap-3 mb-6 text-sky-400">
+                      <FileText size={20} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Historical Narrative</span>
+                    </div>
+                    <div className="text-sm leading-relaxed text-slate-300 font-medium">
+                      {formatText(selectedRecord.patient_report || "No text report available for this entry.")}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 rounded-3xl bg-white/5 border border-white/5">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Diagnostic Score</p>
+                      <p className="text-2xl font-black text-white">{selectedRecord.confidence}%</p>
+                    </div>
+                    <div className="p-6 rounded-3xl bg-white/5 border border-white/5">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk Assessment</p>
+                      <p className="text-2xl font-black text-rose-400">{selectedRecord.risk}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-8 border-t border-white/5 flex justify-end gap-4 bg-white/5">
+                 <button className="h-14 px-8 rounded-2xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 transition-all">
+                    Delete Record
+                 </button>
+                 <button className="h-14 px-10 rounded-2xl bg-sky-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 transition-all shadow-xl shadow-sky-500/20">
+                    Export Forensic Report
+                 </button>
               </div>
             </motion.div>
           </div>

@@ -22,10 +22,30 @@ function App() {
   ])
 
   useEffect(() => {
-    const savedRecords = localStorage.getItem('retina_records')
-    if (savedRecords) {
-      setPatientRecords(JSON.parse(savedRecords))
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/records')
+        if (response.ok) {
+          const data = await response.json()
+          // Map backend fields to frontend record format
+          const formatted = data.map(r => ({
+            id: r._id,
+            name: r.filename.split('.')[0] || 'Anonymous',
+            lastScan: r.timestamp.split('T')[0],
+            grade: r.grade,
+            risk: r.grade >= 3 ? 'Critical' : r.grade >= 2 ? 'Medium' : 'Low',
+            ...r
+          }))
+          setPatientRecords(formatted)
+        }
+      } catch (err) {
+        console.error("Failed to sync with Diagnostic Vault:", err)
+        // Fallback to local if backend is unreachable
+        const saved = localStorage.getItem('retina_records')
+        if (saved) setPatientRecords(JSON.parse(saved))
+      }
     }
+    fetchHistory()
   }, [])
 
   useEffect(() => {
