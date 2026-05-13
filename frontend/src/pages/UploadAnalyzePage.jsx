@@ -70,7 +70,7 @@ function UploadAnalyzePage({ onScanComplete }) {
         return text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
     };
 
-    const auditHtml = (result.interpretation.clinical_audit || "").split('\n').map(line => {
+    const auditHtml = (result.interpretation?.clinical_audit || "").split('\n').map(line => {
         if (!line.trim()) return '';
         const parts = line.split(':');
         if (parts.length > 1) {
@@ -115,7 +115,7 @@ function UploadAnalyzePage({ onScanComplete }) {
             </div>
             <div class="card">
               <div class="section-title">XAI Agreement</div>
-              <div class="value">${(result.interpretation.agreement_score * 100).toFixed(1)}%</div>
+              <div class="value">${((result.interpretation?.agreement_score || 0) * 100).toFixed(1)}%</div>
               <div style="font-size: 12px; font-weight: 700; color: #6366f1; margin-top: 5px;">Consensus Match</div>
             </div>
           </div>
@@ -130,7 +130,7 @@ function UploadAnalyzePage({ onScanComplete }) {
           <div class="section">
             <div class="section-title">Patient Narrative</div>
             <div class="patient-note">
-              ${pdfFormat(result.interpretation.patient_report)}
+              ${pdfFormat(result.interpretation?.patient_report || "")}
             </div>
           </div>
 
@@ -348,7 +348,7 @@ function UploadAnalyzePage({ onScanComplete }) {
                           <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Clinical Narrative</span>
                        </div>
                        <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
-                          {formatText(result.interpretation.patient_report)}
+                          {formatText(result.interpretation?.patient_report)}
                        </div>
                     </div>
                  </div>
