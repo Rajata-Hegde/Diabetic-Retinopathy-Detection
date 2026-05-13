@@ -24,6 +24,18 @@ function PatientRecordsPage({ records, onDelete }) {
     show: { opacity: 1, y: 0 }
   }
 
+  const formatText = (text) => {
+    if (!text) return text;
+    const boldTerms = ['Grade 0', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Critical', 'High Risk', 'Urgent', 'No DR', 'Severe', 'Moderate', 'Mild'];
+    let formatted = text;
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black">$1</strong>');
+    boldTerms.forEach(term => {
+      const reg = new RegExp(`(${term})`, 'gi');
+      formatted = formatted.replace(reg, '<strong class="text-sky-400 font-black">$1</strong>');
+    });
+    return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+  }
+
   const exportForensicPDF = (record) => {
     const printWindow = window.open('', '_blank');
     
@@ -111,7 +123,7 @@ function PatientRecordsPage({ records, onDelete }) {
 
             <div class="section">
               <div class="section-title">Automated Clinical Narrative</div>
-              <div class="narrative">${pdfFormat(record.patient_report)}</div>
+              <div class="narrative">${pdfFormat(record.patient_report || "")}</div>
             </div>
 
             <div class="footer">
@@ -307,7 +319,11 @@ function PatientRecordsPage({ records, onDelete }) {
                     <div className="grid grid-cols-2 gap-6">
                        <div className="p-8 rounded-[40px] bg-white/5 border border-white/5">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Verdict</p>
-                          <h4 className="text-4xl font-black text-white">{selectedRecord.grade_name || `Grade ${selectedRecord.grade}`}</h4>
+                          <h4 className={`font-black text-white leading-none ${
+                             (selectedRecord.grade_name || "").length > 10 ? 'text-2xl' : 'text-4xl'
+                          }`}>
+                             {selectedRecord.grade_name || `Grade ${selectedRecord.grade}`}
+                          </h4>
                        </div>
                        <div className="p-8 rounded-[40px] bg-white/5 border border-white/5">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Confidence</p>
@@ -320,9 +336,9 @@ function PatientRecordsPage({ records, onDelete }) {
                           <FileText size={20} className="text-emerald-400" />
                           <span className="text-[10px] font-black text-white uppercase tracking-widest">Patient Narrative</span>
                        </div>
-                       <p className="text-lg text-slate-300 leading-relaxed font-medium italic">
-                          {selectedRecord.patient_report}
-                       </p>
+                       <div className="text-lg text-slate-300 leading-relaxed font-medium italic">
+                          {formatText(selectedRecord.patient_report)}
+                       </div>
                     </div>
 
                     <div className="p-10 rounded-[48px] bg-white/5 border border-white/5">
@@ -331,7 +347,7 @@ function PatientRecordsPage({ records, onDelete }) {
                           <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical Audit Log</span>
                        </div>
                        <div className="space-y-4 font-mono text-[11px] text-slate-500">
-                          {selectedRecord.clinical_audit?.split('\n').map((line, i) => (
+                          {(selectedRecord.clinical_audit || "").split('\n').map((line, i) => (
                              <div key={i} className="flex gap-4 border-b border-white/5 pb-2">
                                 <span className="text-emerald-500/50">[{i+1}]</span>
                                 <span>{line}</span>

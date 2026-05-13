@@ -79,6 +79,30 @@ function App() {
     setPatientRecords(prev => [newRecord, ...prev])
   }
 
+  const handleDiagnosticAnalysis = async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('http://localhost:8000/analyze', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) throw new Error('Neural analysis failed')
+    
+    const data = await response.json()
+    const formatted = {
+      id: data._id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+      name: file.name.split('.')[0],
+      lastScan: new Date().toLocaleDateString(),
+      ...data,
+      risk: data.grade >= 3 ? 'Critical' : data.grade >= 2 ? 'Medium' : 'Low'
+    }
+    
+    addPatientRecord(formatted)
+    return formatted
+  }
+
   const handleDeleteRecord = async (recordId) => {
     try {
       const response = await fetch(`http://localhost:8000/records/${recordId}`, { method: 'DELETE' })
@@ -206,7 +230,7 @@ function App() {
                 />
               )}
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
-              {activePage === 'upload' && <UploadAnalyzePage onScanComplete={addPatientRecord} />}
+              {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
               {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
               {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />}
               {activePage === 'settings' && <SettingsPage />}
