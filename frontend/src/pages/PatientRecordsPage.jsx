@@ -26,14 +26,37 @@ function PatientRecordsPage({ records, onDelete }) {
 
   const formatText = (text) => {
     if (!text) return text;
-    const boldTerms = ['Grade 0', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Critical', 'High Risk', 'Urgent', 'No DR', 'Severe', 'Moderate', 'Mild'];
-    let formatted = text;
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black">$1</strong>');
-    boldTerms.forEach(term => {
-      const reg = new RegExp(`(${term})`, 'gi');
-      formatted = formatted.replace(reg, '<strong class="text-sky-400 font-black">$1</strong>');
-    });
-    return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+    // Clean redundant salutations, structural markers, and patient identifiers
+    let cleanedText = text
+      .replace(/Dear Patient,?\s?/gi, '')
+      .replace(/Patient:\s?.*?\n/gi, '')
+      .replace(/(Mr\.|Ms\.|Mrs\.)\s?.*?\s/gi, '')
+      .replace(/Part\s?\d+:?\s?/gi, '')
+      .replace(/Section\s?\d+:?\s?/gi, '');
+    
+    // Replace markdown bold with premium strong tags
+    let formatted = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black drop-shadow-sm">$1</strong>');
+    
+    // Highlight specific clinical terms
+    const clinicalHighlights = {
+      grade: /Grade\s[0-4]/gi,
+      risk: /(Critical|High Risk|Moderate|Mild|No DR)/gi,
+      medical: /(Retinopathy|Hemorrhages|Exudates|Microaneurysms|Macula|Optic Disc)/gi
+    };
+
+    formatted = formatted.replace(clinicalHighlights.grade, '<span class="text-sky-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.risk, '<span class="text-rose-400 font-black tracking-tight">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.medical, '<span class="text-indigo-300 font-bold">$1</span>');
+    
+    // Add subtle paragraph spacing
+    formatted = formatted.split('\n').map(p => `<p class="mb-3 last:mb-0 leading-relaxed">${p}</p>`).join('');
+
+    return (
+      <div className="relative">
+         <div className="absolute -left-6 top-0 bottom-0 w-[1px] bg-gradient-to-b from-sky-500/50 via-sky-500/10 to-transparent" />
+         <div className="text-sm text-slate-300 font-medium" dangerouslySetInnerHTML={{ __html: formatted }} />
+      </div>
+    );
   }
 
   const exportForensicPDF = (record) => {
@@ -341,18 +364,13 @@ function PatientRecordsPage({ records, onDelete }) {
                        </div>
                     </div>
 
-                    <div className="p-10 rounded-[48px] bg-white/5 border border-white/5">
-                       <div className="flex items-center gap-3 mb-6">
-                          <Activity size={20} className="text-slate-500" />
-                          <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical Audit Log</span>
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative group">
+                       <div className="flex items-center gap-3 mb-4">
+                          <Activity size={16} className="text-emerald-400" />
+                          <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Audit Log</span>
                        </div>
-                       <div className="space-y-4 font-mono text-[11px] text-slate-500">
-                          {(selectedRecord.clinical_audit || "").split('\n').map((line, i) => (
-                             <div key={i} className="flex gap-4 border-b border-white/5 pb-2">
-                                <span className="text-emerald-500/50">[{i+1}]</span>
-                                <span>{line}</span>
-                             </div>
-                          ))}
+                       <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                          {formatText(selectedRecord.clinical_audit)}
                        </div>
                     </div>
                   </div>
