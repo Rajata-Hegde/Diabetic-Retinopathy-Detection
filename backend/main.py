@@ -100,7 +100,7 @@ try:
 except Exception:
     HAS_RETRIEVAL = False
 
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 # MongoDB Configuration
 MONGODB_URI = os.getenv("MONGODB_URI")

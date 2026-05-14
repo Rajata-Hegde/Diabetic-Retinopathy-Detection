@@ -66,10 +66,75 @@ function UploadAnalyzePage({ onAnalyze }) {
 
   const isComplete = result?.status === 'complete' || analysisStage === 'complete'
 
+  const getAnalyzedSuggestions = (data) => {
+    if (data.suggestions && data.suggestions.length > 0) return data.suggestions;
+
+    const grade = parseInt(data.grade);
+    let advice = [];
+
+    switch (grade) {
+      case 0:
+        advice = [
+          "Maintain routine annual diabetic eye screening schedule.",
+          "Continue optimal glycemic and blood pressure control.",
+          "Educate patient on importance of regular eye checkups.",
+          "No immediate ophthalmological referral required for DR."
+        ];
+        break;
+      case 1:
+        advice = [
+          "Schedule follow-up diabetic eye screening in 12 months.",
+          "Optimize metabolic control (HbA1c, BP, Lipids) to prevent progression.",
+          "Refer to primary care for intensive risk factor management.",
+          "Provide patient education on early retinopathy signs."
+        ];
+        break;
+      case 2:
+        advice = [
+          "Refer to an ophthalmologist for a dilated fundus examination.",
+          "Consider specialist follow-up within 6 months to monitor progression.",
+          "Reinforce strict glycemic and blood pressure management.",
+          "Discuss potential for progression and treatment options."
+        ];
+        break;
+      case 3:
+        advice = [
+          "Urgent referral to a retina specialist (recommended within 4 weeks).",
+          "Requires comprehensive eye exam and likely OCT imaging.",
+          "High risk of progression to vision-threatening disease.",
+          "Intensive systemic management of diabetes and hypertension."
+        ];
+        break;
+      case 4:
+        advice = [
+          "Emergency referral to a retina specialist for immediate evaluation.",
+          "Consider urgent intervention (Anti-VEGF, Laser, or Surgery).",
+          "Extremely high risk of permanent vision loss if untreated.",
+          "Immediate coordination with the patient's multi-disciplinary care team."
+        ];
+        break;
+      default:
+        advice = [
+          "Refer to ophthalmology for specialist assessment.",
+          "Schedule dilated fundus exam to confirm diagnostic findings.",
+          "Document findings in EHR and notify primary care team."
+        ];
+    }
+
+    if (data.confidence < 75) {
+      advice.push("Correlate findings with clinical exam due to moderate model confidence.");
+    }
+    if (data.xai_agreement < 40) {
+      advice.push("Obtain multimodal imaging (OCT/FA) due to inconsistent XAI consensus.");
+    }
+
+    return advice;
+  };
+
   const printToPDF = () => {
     if (!result) return;
     const printWindow = window.open('', '_blank');
-    
+
     const pdfFormat = (text) => {
       if (!text) return "";
       // remove explicit numeric scores or % from narrative
@@ -78,12 +143,12 @@ function UploadAnalyzePage({ onAnalyze }) {
     };
 
     const auditHtml = (result.clinical_audit || "").split('\n').map(line => {
-        if (!line.trim()) return '';
-        const parts = line.split(':');
-        if (parts.length > 1) {
-            return `<li><span style="color: #0ea5e9; font-weight: 800;">${parts[0]}:</span> ${parts.slice(1).join(':')}</li>`;
-        }
-        return `<li>${line}</li>`;
+      if (!line.trim()) return '';
+      const parts = line.split(':');
+      if (parts.length > 1) {
+        return `<li><span style="color: #0ea5e9; font-weight: 800;">${parts[0]}:</span> ${parts.slice(1).join(':')}</li>`;
+      }
+      return `<li>${line}</li>`;
     }).join('');
 
     const html = `
@@ -152,13 +217,7 @@ function UploadAnalyzePage({ onAnalyze }) {
             <div class="section-title">Suggested Next Steps</div>
             <div class="card">
               <ul style="margin:0;padding-left:16px;">
-                ${(result.suggestions && result.suggestions.length) ? result.suggestions.map(s => `<li>${s}</li>`).join('') : `
-                  <li>Refer to ophthalmology for specialist assessment.</li>
-                  <li>Schedule a dilated fundus exam and confirm imaging quality.</li>
-                  <li>Document findings in the patient's EHR and notify care team.</li>
-                  <li>Repeat imaging or obtain multimodal imaging if evidence is inconclusive.</li>
-                  <li>Consider referral pathways for urgent treatment if indicated.</li>
-                `}
+                ${getAnalyzedSuggestions(result).map(s => `<li>${s}</li>`).join('')}
               </ul>
             </div>
           </div>
@@ -199,7 +258,7 @@ function UploadAnalyzePage({ onAnalyze }) {
 
     // Replace markdown bold with premium strong tags
     let formatted = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black drop-shadow-sm">$1</strong>');
-    
+
     // Highlight specific clinical terms
     const clinicalHighlights = {
       grade: /Grade\s[0-4]/gi,
@@ -210,28 +269,29 @@ function UploadAnalyzePage({ onAnalyze }) {
     formatted = formatted.replace(clinicalHighlights.grade, '<span class="text-sky-400 font-black tracking-tight">$1</span>');
     formatted = formatted.replace(clinicalHighlights.risk, '<span class="text-rose-400 font-black tracking-tight">$1</span>');
     formatted = formatted.replace(clinicalHighlights.medical, '<span class="text-indigo-300 font-bold">$1</span>');
-    
+
     // Add subtle paragraph spacing
     formatted = formatted.split('\n').map(p => `<p class="mb-3 last:mb-0 leading-relaxed">${p}</p>`).join('');
 
     return (
       <div className="relative">
-         <div className="absolute -left-6 top-0 bottom-0 w-[1px] bg-gradient-to-b from-sky-500/50 via-sky-500/10 to-transparent" />
-         <div className="text-sm text-slate-300 font-medium" dangerouslySetInnerHTML={{ __html: formatted }} />
+        <div className="absolute -left-6 top-0 bottom-0 w-[1px] bg-gradient-to-b from-sky-500/50 via-sky-500/10 to-transparent" />
+        <div className="text-sm text-slate-300 font-medium" dangerouslySetInnerHTML={{ __html: formatted }} />
       </div>
     );
   }
+
 
   return (
     <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
       {/* Background Layer */}
       <div className="absolute inset-0 z-0">
-         <img 
-          src="/assets/upload_bg.png" 
-          className="h-full w-full object-cover opacity-40 scale-105 group-hover:scale-100 transition-transform duration-[10s]" 
+        <img
+          src="/assets/upload_bg.png"
+          className="h-full w-full object-cover opacity-40 scale-105 group-hover:scale-100 transition-transform duration-[10s]"
           alt="Futuristic Background"
-         />
-         <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/80 to-[#020617]/40" />
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#020617]/80 to-[#020617]/40" />
       </div>
 
       <div className="relative z-10 p-12">
@@ -244,71 +304,70 @@ function UploadAnalyzePage({ onAnalyze }) {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-4xl mx-auto"
             >
-               <div className="text-center mb-12">
-                  <h2 className="text-5xl font-black text-white tracking-tighter mb-4">Neural Entry Point</h2>
-                  <p className="text-lg text-slate-400 font-medium max-w-xl mx-auto">
-                    Initiate a high-fidelity retinal analysis. Our multi-modal XAI ensemble will perform a deep-tissue audit of your fundus imaging.
-                  </p>
-               </div>
+              <div className="text-center mb-12">
+                <h2 className="text-5xl font-black text-white tracking-tighter mb-4">Neural Entry Point</h2>
+                <p className="text-lg text-slate-400 font-medium max-w-xl mx-auto">
+                  Initiate a high-fidelity retinal analysis. Our multi-modal XAI ensemble will perform a deep-tissue audit of your fundus imaging.
+                </p>
+              </div>
 
-               <div className="grid gap-10 lg:grid-cols-2">
-                 <div {...getRootProps()} className={`relative aspect-square rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-12 overflow-hidden ${
-                   isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
-                 }`}>
-                   <input {...getInputProps()} />
-                   {preview ? (
-                     <img src={preview} className="h-full w-full object-contain" />
-                   ) : (
-                     <>
-                        <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center text-slate-500 mb-6">
-                           <Upload size={40} />
-                        </div>
-                        <p className="text-sm font-black uppercase tracking-widest text-slate-400">Drop fundus image here</p>
-                        <p className="mt-2 text-xs font-bold text-slate-600">Supported formats: JPEG, PNG</p>
-                     </>
-                   )}
-                 </div>
+              <div className="grid gap-10 lg:grid-cols-2">
+                <div {...getRootProps()} className={`relative min-h-[450px] rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-6 overflow-hidden ${isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
+                  }`}>
+                  <input {...getInputProps()} />
+                  {preview ? (
+                    <img src={preview} className="max-h-full max-w-full object-contain rounded-2xl" />
+                  ) : (
+                    <>
+                      <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center text-slate-500 mb-6">
+                        <Upload size={40} />
+                      </div>
+                      <p className="text-sm font-black uppercase tracking-widest text-slate-400">Drop fundus image here</p>
+                      <p className="mt-2 text-xs font-bold text-slate-600">Supported formats: JPEG, PNG</p>
+                    </>
+                  )}
+                </div>
 
-                 <div className="flex flex-col justify-center space-y-6">
-                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-xl">
-                       <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                          <Shield size={16} className="text-sky-400" />
-                          Diagnostic Protocols
-                       </h3>
-                       <ul className="space-y-4">
-                          {[
-                            'Real-time Severity Classification',
-                            'Neural Consensus (Grad-CAM,SHAP,LIME)',
-                            'Automated Clinical Audit Log',
-                            'End-to-End Cloud Archival'
-                          ].map((text, i) => (
-                            <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-400">
-                               <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-                               {text}
-                            </li>
-                          ))}
-                       </ul>
-                    </div>
+                <div className="flex flex-col justify-center space-y-6">
+                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-xl">
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Shield size={16} className="text-sky-400" />
+                      Diagnostic Protocols
+                    </h3>
+                    <ul className="space-y-4">
+                      {[
+                        'Real-time Severity Classification',
+                        'Neural Consensus (Grad-CAM,SHAP,LIME)',
+                        'Automated Clinical Audit Log',
+                        'End-to-End Cloud Archival'
+                      ].map((text, i) => (
+                        <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                          <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                          {text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                    <button
-                      onClick={handleAnalyze}
-                      disabled={!file || analyzing}
-                      className="h-20 w-full rounded-[32px] bg-sky-500 text-white font-black text-lg tracking-tight hover:bg-sky-400 transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-4 shadow-xl shadow-sky-500/20"
-                    >
-                      {analyzing ? (
-                        <>
-                          <RefreshCcw size={24} className="animate-spin" />
-                          {stageMessage[analysisStage] || 'Calibrating Neural Net...'}
-                        </>
-                      ) : (
-                        <>
-                          Run Diagnostic Audit
-                          <ArrowRight size={24} />
-                        </>
-                      )}
-                    </button>
-                 </div>
-               </div>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={!file || analyzing}
+                    className="h-20 w-full rounded-[32px] bg-sky-500 text-white font-black text-lg tracking-tight hover:bg-sky-400 transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-4 shadow-xl shadow-sky-500/20"
+                  >
+                    {analyzing ? (
+                      <>
+                        <RefreshCcw size={24} className="animate-spin" />
+                        {stageMessage[analysisStage] || 'Calibrating Neural Net...'}
+                      </>
+                    ) : (
+                      <>
+                        Run Diagnostic Audit
+                        <ArrowRight size={24} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -317,165 +376,156 @@ function UploadAnalyzePage({ onAnalyze }) {
               animate={{ opacity: 1, scale: 1 }}
               className="max-w-6xl mx-auto space-y-10"
             >
-               {/* Analysis Header */}
-               <div className="flex items-center justify-between premium-glass p-8 rounded-[40px] border border-white/10">
-                  <div className="flex items-center gap-6">
-                    <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
-                      <Zap size={32} />
-                    </div>
-                    <div>
-                      <h3 className="text-3xl font-black text-white tracking-tight">Diagnostic Verdict</h3>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Sequence ID: {result.id || result.analysis_id}</span>
-                        <span className="h-1 w-1 rounded-full bg-slate-700" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{isComplete ? 'Scan Finalized' : (stageMessage[analysisStage] || 'Processing')}</span>
-                      </div>
+              {/* Analysis Header */}
+              <div className="flex items-center justify-between premium-glass p-8 rounded-[40px] border border-white/10">
+                <div className="flex items-center gap-6">
+                  <div className="h-16 w-16 rounded-3xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                    <Zap size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-black text-white tracking-tight">Diagnostic Verdict</h3>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Sequence ID: {result.id || result.analysis_id}</span>
+                      <span className="h-1 w-1 rounded-full bg-slate-700" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{isComplete ? 'Scan Finalized' : (stageMessage[analysisStage] || 'Processing')}</span>
                     </div>
                   </div>
-                  {/* Review gate intentionally removed from UI - tool is for preliminary diagnosis only */}
-                  <div className="flex gap-4">
-                     <button 
-                      onClick={printToPDF}
-                      disabled={!isComplete}
-                      className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 flex items-center gap-2"
-                     >
-                        <Printer size={16} />
-                        PDF Report
-                     </button>
-                     <button onClick={reset} className="h-14 px-8 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all">
-                        Reset Terminal
-                     </button>
+                </div>
+                {/* Review gate intentionally removed from UI - tool is for preliminary diagnosis only */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={printToPDF}
+                    disabled={!isComplete}
+                    className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 flex items-center gap-2"
+                  >
+                    <Printer size={16} />
+                    PDF Report
+                  </button>
+                  <button onClick={reset} className="h-14 px-8 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all">
+                    Reset Terminal
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-10 lg:grid-cols-2">
+                {/* Visual Evidence */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Forensic Neural Mapping</h4>
+                    <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/5">
+                      {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
+                        <button
+                          key={id}
+                          onClick={() => setActiveXai(id)}
+                          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-sky-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-               </div>
-
-               <div className="grid gap-10 lg:grid-cols-2">
-                 {/* Visual Evidence */}
-                 <div className="space-y-6">
-                   <div className="flex items-center justify-between">
-                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Forensic Neural Mapping</h4>
-                     <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/5">
-                        {['original', 'gradcam', 'lime', 'shap', 'consensus'].map(id => (
-                          <button
-                            key={id}
-                            onClick={() => setActiveXai(id)}
-                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeXai === id ? 'bg-sky-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                          >
-                            {id}
-                          </button>
-                        ))}
-                     </div>
-                   </div>
-                   <div className="relative aspect-square rounded-[54px] bg-black border border-white/10 overflow-hidden shadow-2xl">
-                       {result.images?.[activeXai] ? (
-                         <img src={`data:image/jpeg;base64,${result.images[activeXai]}`} className="h-full w-full object-contain" />
-                       ) : (
-                         <div className="flex flex-col h-full items-center justify-center gap-4">
-                            <RefreshCcw size={32} className="text-slate-800 animate-spin" />
-                            <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Rendering Projection...</p>
-                         </div>
-                       )}
-                       <div className="absolute top-8 left-8 flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/10">
-                          <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
-                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{activeXai} Layer</span>
-                       </div>
-                   </div>
-
-                   {/* Left-side clinical audit removed — explanation is shown beside the image (right column) */}
-                 </div>
-
-                 {/* Report Content */}
-                 <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-4 text-sky-500/10">
-                             <Activity size={60} />
-                          </div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Severity Grade</p>
-                          <h4 className={`font-black text-white tracking-tighter leading-none ${
-                             (result.grade_name || "").length > 10 ? 'text-3xl' : 'text-5xl'
-                          }`}>
-                             {result.grade_name || `Grade ${result.grade}`}
-                          </h4>
-                          <p className="text-[10px] font-bold text-sky-400 mt-2">Classified as {result.risk}</p>
-                       </div>
-                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-4 text-emerald-500/10">
-                             <Globe size={60} />
-                          </div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Model Confidence</p>
-                          <div className="flex items-baseline gap-4">
-                            <h4 className="text-5xl font-black text-white tracking-tighter">{(result.confidence ?? '--')}%</h4>
-                            {!isComplete && (
-                              <span className="text-sm font-semibold text-slate-400">Provisional</span>
-                            )}
-                          </div>
-                          <p className="text-[10px] font-bold text-emerald-400 mt-2">VLM Alignment: {(result.vlm_alignment || 'pending').toUpperCase()}</p>
-                       </div>
-                    </div>
-
-                      <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden">
-                       <div className="flex items-center gap-3 mb-6">
-                          <Sparkles size={20} className="text-sky-400" />
-                          {/* <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Patient Narrative</span> */}
-                       </div>
-                        <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
-                          {result.patient_report ? formatText(result.patient_report) : (
-                          <p className="text-sm text-slate-500 font-semibold">Patient-friendly summary is being generated...</p>
-                          )}
-                       </div>
-                    </div>
-
-                      <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                        <div className="flex items-center gap-3 mb-4">
-                          <Activity size={16} className="text-sky-400" />
-                          <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings (concise)</span>
-                        </div>
-                        <div className="max-h-40 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
-                         {result.clinical_audit ? (
-                          result.clinical_audit.split('\n').slice(0,5).map((l,i) => <div key={i}>{l}</div>)
-                         ) : (
-                          <div className="text-sm text-slate-500">Clinical findings will appear after VLM completes.</div>
-                         )}
-                        </div>
+                  <div className="relative aspect-[4/3] rounded-[32px] bg-[#000000] border border-white/10 overflow-hidden shadow-2xl group/img flex items-center justify-center">
+                    {result.images?.[activeXai] ? (
+                      <img 
+                        src={`data:image/jpeg;base64,${result.images[activeXai]}`} 
+                        className="max-h-full max-w-full object-contain transition-transform duration-700" 
+                      />
+                    ) : (
+                      <div className="flex flex-col h-full items-center justify-center gap-4">
+                        <RefreshCcw size={32} className="text-slate-800 animate-spin" />
+                        <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Rendering Projection...</p>
                       </div>
-
-                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                      <div className="flex items-center gap-3 mb-4">
-                        <BrainCircuit size={16} className="text-sky-400" />
-                        <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
-                      </div>
-                      <div className="text-sm text-slate-300">
-                        {result.suggestions && result.suggestions.length ? (
-                          <ul className="list-disc pl-5 space-y-1">{result.suggestions.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                        ) : (
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>Refer to ophthalmology for specialist assessment.</li>
-                            <li>Schedule a dilated fundus exam and confirm imaging quality.</li>
-                            <li>Document findings in the patient's EHR and notify the care team.</li>
-                            <li>Repeat imaging or obtain multimodal imaging if evidence is inconclusive.</li>
-                            <li>Consider urgent referral pathways if severe pathology suspected.</li>
-                          </ul>
-                        )}
-                      </div>
+                    )}
+                    <div className="absolute top-8 left-8 flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/10">
+                      <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">{activeXai} Layer</span>
                     </div>
+                  </div>
 
-                    <div className="premium-glass p-8 rounded-[40px] border border-white/5 bg-gradient-to-br from-sky-500/10 to-transparent">
-                       <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Diagnostic Integrity</h4>
-                       <div className="space-y-3">
-                          {[
-                            { label: 'Classifier Confidence', val: `${result.confidence ?? '--'}%` },
-                            { label: 'XAI Agreement', val: `${result.xai_agreement ?? '--'}%` },
-                            { label: 'VLM Alignment', val: (result.vlm_alignment || 'pending').toUpperCase() }
-                          ].map(s => (
-                            <div key={s.label} className="flex justify-between items-center text-[10px] font-bold">
-                               <span className="text-slate-500">{s.label}</span>
-                               <span className="text-sky-400">{s.val}</span>
-                            </div>
+                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                    <div className="flex items-center gap-3 mb-4">
+                      <BrainCircuit size={16} className="text-sky-400" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      {isComplete ? (
+                        <ul className="list-disc pl-5 space-y-1">
+                          {getAnalyzedSuggestions(result).map((s, i) => (
+                            <li key={i} className={s.includes('Urgent') || s.includes('Emergency') ? 'text-rose-400 font-bold' : ''}>
+                              {s}
+                            </li>
                           ))}
-                       </div>
+                        </ul>
+                      ) : (
+                        <div className="text-sm text-slate-500">Suggested steps will be finalized after full analysis.</div>
+                      )}
                     </div>
-                 </div>
-               </div>
+                  </div>
+                </div>
+
+                {/* Report Content */}
+                <div className="space-y-8">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 text-sky-500/10">
+                        <Activity size={60} />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Severity Grade</p>
+                      <h4 className={`font-black text-white tracking-tighter leading-none ${(result.grade_name || "").length > 10 ? 'text-3xl' : 'text-5xl'
+                        }`}>
+                        {result.grade_name || `Grade ${result.grade}`}
+                      </h4>
+                      <p className="text-[10px] font-bold text-sky-400 mt-2">Classified as {result.risk}</p>
+                    </div>
+                    <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 text-emerald-500/10">
+                        <Globe size={60} />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Model Confidence</p>
+                      <div className="flex items-baseline gap-4">
+                        <h4 className="text-5xl font-black text-white tracking-tighter">{(result.confidence ?? '--')}%</h4>
+                      </div>
+                      <p className="text-[10px] font-bold text-emerald-400 mt-2">VLM Alignment: {(result.vlm_alignment || 'pending').toUpperCase()}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Sparkles size={20} className="text-sky-400" />
+                      {/* <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Patient Narrative</span> */}
+                    </div>
+                    <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
+                      {result.patient_report ? formatText(result.patient_report) : (
+                        <p className="text-sm text-slate-500 font-semibold">Summary being generated...</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Activity size={16} className="text-sky-400" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
+                      {result.clinical_audit ? (
+                        result.clinical_audit.split('\n').map((line, i) => {
+                          if (!line.trim()) return null;
+                          const formatted = line
+                            .replace(/^(.*?):/, '<strong class="text-sky-400">$1:</strong>')
+                            .replace(/(Exudates|Hemorrhages|Microaneurysms|Neovascularization|Cotton wool spots|Macula|Optic Disc)/gi, '<span class="text-white font-bold">$1</span>');
+                          return (
+                            <div key={i} className="mb-2 last:mb-0 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
+                          )
+                        })
+                      ) : (
+                        <div className="text-sm text-slate-500">Clinical findings will appear after VLM completes.</div>
+                      )}
+                    </div>
+                  </div>
+
+
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
