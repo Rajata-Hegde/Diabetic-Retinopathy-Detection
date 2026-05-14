@@ -397,13 +397,10 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
 
     DIAGNOSTIC CONTEXT:
     - AI Prediction: {grade_name}
-<<<<<<< HEAD
-=======
     - Confidence Score: {confidence:.1f}%
     - Agreement Score: {agreement_score*100:.1f}%
     - XAI Methods: {", ".join(methods)}
     - XAI Summary: {xai_text or 'N/A'}
->>>>>>> e3e8ac79e02311d31e679aa5f69e759817733dc1
 
     HARD CONSTRAINTS:
     1) Use only findings visible in the image or supported by the heatmap.
@@ -811,12 +808,7 @@ async def analyze_image(file: UploadFile = File(...)):
         
         predicted_class = int(np.argmax(probs))
         confidence = float(np.max(probs))
-        dr_grades = ["No DR", "Mild DR", "Moderate DR", "Severe DR", "Proliferative DR"]
-        dr_risks = ["Low Risk", "Moderate Risk", "High Risk", "Critical Risk", "Emergency"]
-        grade_name = dr_grades[predicted_class]
-        risk_level = dr_risks[predicted_class]
-        
-        start_time = datetime.utcnow()
+        grade_name = DR_GRADES[predicted_class]
 
         # 3. XAI Suite
         # Grad-CAM
@@ -841,22 +833,43 @@ async def analyze_image(file: UploadFile = File(...)):
         consensus_mask = np.mean([m_grad, m_lime, m_shap], axis=0)
         consensus_viz = show_cam_on_image(np.float32(img_np)/255, consensus_mask, use_rgb=True)
         
-        # Calculate a pseudo agreement score based on mask overlap (simplified)
-        agreement_score = float(np.mean(consensus_mask > 0.5))
-        latency = (datetime.utcnow() - start_time).total_seconds()
-
         # 4. AI Report
-        ai_response = get_gemini_explanation(image, Image.fromarray(consensus_viz), grade_name, confidence*100, ["Grad-CAM", "LIME", "SHAP"], agreement_score)
-        
-        clinical_audit = ""
-        patient_report = ""
-        if ai_response and "[PATIENT_REPORT]" in ai_response:
-            parts = ai_response.split("[PATIENT_REPORT]")
-            clinical_audit = parts[0].replace("[CLINICAL_AUDIT]", "").strip()
-            patient_report = parts[1].strip()
-        else:
-            clinical_audit = ai_response or "Clinical interpretation generated."
-            patient_report = "Analysis complete. View technical details below."
+        agreement_score = _compute_xai_agreement(m_grad, m_lime, m_shap)
+        # build a short xai_summary for RAG-style context
+        try:
+            top_regions = []
+            thresh = consensus_mask > 0.5
+            if thresh.sum() > 0:
+                ys, xs = np.where(thresh)
+                cy, cx = int(np.mean(ys)), int(np.mean(xs))
+                top_regions.append(f"consensus_centroid=({cx},{cy})")
+            top_regions.append(f"agreement={round(agreement_score,3)}")
+            xai_summary = "; ".join(top_regions)
+        except Exception:
+            xai_summary = "agreement={:.3f}".format(agreement_score)
+
+        ai_response = get_gemini_explanation(
+            image,
+            Image.fromarray(consensus_viz),
+            grade_name,
+            confidence * 100,
+            ["Grad-CAM", "LIME", "SHAP"],
+            agreement_score,
+            xai_summary,
+        )
+
+        clinical_audit = ai_response.get("clinical_audit") if isinstance(ai_response, dict) else "Clinical interpretation generated."
+        patient_report = ai_response.get("patient_report") if isinstance(ai_response, dict) else "Analysis complete. View technical details below."
+        vlm_alignment = ai_response.get("evidence_alignment") if isinstance(ai_response, dict) else "unknown"
+        vlm_grade_hint = ai_response.get("vlm_grade_hint") if isinstance(ai_response, dict) else None
+
+        guardrails = _build_guardrail_assessment(
+            predicted_class=predicted_class,
+            confidence_pct=round(confidence * 100, 2),
+            vlm_grade_hint=vlm_grade_hint,
+            alignment=vlm_alignment,
+            xai_agreement=agreement_score,
+        )
 
         # 5. Database Persistence
         result_payload = {
@@ -864,8 +877,7 @@ async def analyze_image(file: UploadFile = File(...)):
             "filename": file.filename,
             "grade": predicted_class,
             "grade_name": grade_name,
-            "risk": risk_level,
-            "latency": round(latency, 2),
+            "confidence": round(confidence * 100, 2),
             "clinical_audit": clinical_audit,
             "patient_report": patient_report,
             "xai_agreement": round(agreement_score * 100, 2),

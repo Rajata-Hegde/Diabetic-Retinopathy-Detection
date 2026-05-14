@@ -63,11 +63,6 @@ function App() {
 
   const pageTitle = navItems.find((item) => item.key === activePage)?.label ?? 'Dashboard'
 
-  const quickStats = [
-    { label: 'Live Activity', value: `${appStats[0].value} scans` },
-    { label: 'Priority', value: `${appStats[1].value} cases` },
-    { label: 'System HP', value: 'Stable' },
-  ]
 
   const searchedRecords = useMemo(() => {
     return patientRecords.filter((item) =>
@@ -181,18 +176,6 @@ function App() {
           </nav>
 
           <div className="mt-auto space-y-6">
-            <div className="rounded-3xl bg-white/5 p-6 border border-white/5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Live Pulse</p>
-              <div className="mt-4 space-y-3">
-                {quickStats.map(stat => (
-                  <div key={stat.label} className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-medium">{stat.label}</span>
-                    <span className="text-xs font-bold text-sky-400">{stat.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
               <LogOut size={20} />
               <span className="font-bold tracking-tight text-sm">Sign Out</span>
