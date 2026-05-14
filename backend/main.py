@@ -811,16 +811,12 @@ async def analyze_image(file: UploadFile = File(...)):
         
         predicted_class = int(np.argmax(probs))
         confidence = float(np.max(probs))
-<<<<<<< HEAD
         dr_grades = ["No DR", "Mild DR", "Moderate DR", "Severe DR", "Proliferative DR"]
         dr_risks = ["Low Risk", "Moderate Risk", "High Risk", "Critical Risk", "Emergency"]
         grade_name = dr_grades[predicted_class]
         risk_level = dr_risks[predicted_class]
         
         start_time = datetime.utcnow()
-=======
-        grade_name = DR_GRADES[predicted_class]
->>>>>>> e3e8ac79e02311d31e679aa5f69e759817733dc1
 
         # 3. XAI Suite
         # Grad-CAM
@@ -850,7 +846,6 @@ async def analyze_image(file: UploadFile = File(...)):
         latency = (datetime.utcnow() - start_time).total_seconds()
 
         # 4. AI Report
-<<<<<<< HEAD
         ai_response = get_gemini_explanation(image, Image.fromarray(consensus_viz), grade_name, confidence*100, ["Grad-CAM", "LIME", "SHAP"], agreement_score)
         
         clinical_audit = ""
@@ -862,44 +857,6 @@ async def analyze_image(file: UploadFile = File(...)):
         else:
             clinical_audit = ai_response or "Clinical interpretation generated."
             patient_report = "Analysis complete. View technical details below."
-=======
-        agreement_score = _compute_xai_agreement(m_grad, m_lime, m_shap)
-        # build a short xai_summary for RAG-style context
-        try:
-            top_regions = []
-            thresh = consensus_mask > 0.5
-            if thresh.sum() > 0:
-                ys, xs = np.where(thresh)
-                cy, cx = int(np.mean(ys)), int(np.mean(xs))
-                top_regions.append(f"consensus_centroid=({cx},{cy})")
-            top_regions.append(f"agreement={round(agreement_score,3)}")
-            xai_summary = "; ".join(top_regions)
-        except Exception:
-            xai_summary = "agreement={:.3f}".format(agreement_score)
-
-        ai_response = get_gemini_explanation(
-            image,
-            Image.fromarray(consensus_viz),
-            grade_name,
-            confidence * 100,
-            ["Grad-CAM", "LIME", "SHAP"],
-            agreement_score,
-            xai_summary,
-        )
-
-        clinical_audit = ai_response.get("clinical_audit") if isinstance(ai_response, dict) else "Clinical interpretation generated."
-        patient_report = ai_response.get("patient_report") if isinstance(ai_response, dict) else "Analysis complete. View technical details below."
-        vlm_alignment = ai_response.get("evidence_alignment") if isinstance(ai_response, dict) else "unknown"
-        vlm_grade_hint = ai_response.get("vlm_grade_hint") if isinstance(ai_response, dict) else None
-
-        guardrails = _build_guardrail_assessment(
-            predicted_class=predicted_class,
-            confidence_pct=round(confidence * 100, 2),
-            vlm_grade_hint=vlm_grade_hint,
-            alignment=vlm_alignment,
-            xai_agreement=agreement_score,
-        )
->>>>>>> e3e8ac79e02311d31e679aa5f69e759817733dc1
 
         # 5. Database Persistence
         result_payload = {
