@@ -312,11 +312,11 @@ function UploadAnalyzePage({ onAnalyze }) {
               </div>
 
               <div className="grid gap-10 lg:grid-cols-2">
-                <div {...getRootProps()} className={`relative aspect-square rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-12 overflow-hidden ${isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
+                <div {...getRootProps()} className={`relative min-h-[450px] rounded-[48px] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-6 overflow-hidden ${isDragActive ? 'border-sky-400 bg-sky-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'
                   }`}>
                   <input {...getInputProps()} />
                   {preview ? (
-                    <img src={preview} className="h-full w-full object-contain" />
+                    <img src={preview} className="max-h-full max-w-full object-contain rounded-2xl" />
                   ) : (
                     <>
                       <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center text-slate-500 mb-6">
@@ -424,11 +424,11 @@ function UploadAnalyzePage({ onAnalyze }) {
                       ))}
                     </div>
                   </div>
-                  <div className="relative aspect-square rounded-[54px] bg-[#000105] border border-white/10 overflow-hidden shadow-2xl group/img">
+                  <div className="relative aspect-[4/3] rounded-[32px] bg-[#000000] border border-white/10 overflow-hidden shadow-2xl group/img flex items-center justify-center">
                     {result.images?.[activeXai] ? (
                       <img 
                         src={`data:image/jpeg;base64,${result.images[activeXai]}`} 
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105" 
+                        className="max-h-full max-w-full object-contain transition-transform duration-700" 
                       />
                     ) : (
                       <div className="flex flex-col h-full items-center justify-center gap-4">
@@ -442,7 +442,25 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                   </div>
 
-                  {/* Left-side clinical audit removed — explanation is shown beside the image (right column) */}
+                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                    <div className="flex items-center gap-3 mb-4">
+                      <BrainCircuit size={16} className="text-sky-400" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      {isComplete ? (
+                        <ul className="list-disc pl-5 space-y-1">
+                          {getAnalyzedSuggestions(result).map((s, i) => (
+                            <li key={i} className={s.includes('Urgent') || s.includes('Emergency') ? 'text-rose-400 font-bold' : ''}>
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-sm text-slate-500">Suggested steps will be finalized after full analysis.</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Report Content */}
@@ -505,21 +523,6 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                   </div>
 
-                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                    <div className="flex items-center gap-3 mb-4">
-                      <BrainCircuit size={16} className="text-sky-400" />
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
-                    </div>
-                    <div className="text-sm text-slate-300">
-                      <ul className="list-disc pl-5 space-y-1">
-                        {getAnalyzedSuggestions(result).map((s, i) => (
-                          <li key={i} className={s.includes('Urgent') || s.includes('Emergency') ? 'text-rose-400 font-bold' : ''}>
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
 
                 </div>
               </div>
