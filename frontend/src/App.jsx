@@ -6,7 +6,7 @@ import HomePage from './pages/HomePage'
 import DashboardHome from './pages/DashboardHome'
 import UploadAnalyzePage from './pages/UploadAnalyzePage'
 import PatientRecordsPage from './pages/PatientRecordsPage'
-import AnalyticsPage from './pages/AnalyticsPage'
+// import AnalyticsPage from './pages/AnalyticsPage'
 import SettingsPage from './pages/SettingsPage'
 import Chatbot from './components/Chatbot'
 import './App.css'
@@ -18,7 +18,7 @@ function App() {
   const [appStats, setAppStats] = useState([
     { title: 'Scans Today', value: '0', icon: UploadCloud },
     { title: 'High Risk Cases', value: '0', icon: Bell },
-    { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
+    // { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
   ])
 
   useEffect(() => {
@@ -57,7 +57,7 @@ function App() {
     setAppStats([
       { title: 'Scans Today', value: todayScans.toString(), icon: UploadCloud },
       { title: 'High Risk Cases', value: urgentCases.toString(), icon: Bell },
-      { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
+      // { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
     ])
   }, [patientRecords])
 
@@ -79,28 +79,48 @@ function App() {
     setPatientRecords(prev => [newRecord, ...prev])
   }
 
-  const handleDiagnosticAnalysis = async (file) => {
+  const formatDiagnosticPayload = (data, file) => ({
+    id: data._id || data.analysis_id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    analysis_id: data.analysis_id,
+    status: data.status,
+    name: file.name.split('.')[0],
+    lastScan: new Date().toLocaleDateString(),
+    ...data,
+    risk: data.grade >= 3 ? 'Critical' : data.grade >= 2 ? 'Medium' : 'Low'
+  })
+
+  const handleDiagnosticAnalysis = async (file, onProgress) => {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch('http://localhost:8000/analyze', {
+    const response = await fetch('http://localhost:8000/analyze/start', {
       method: 'POST',
       body: formData
     })
 
     if (!response.ok) throw new Error('Neural analysis failed')
-    
-    const data = await response.json()
-    const formatted = {
-      id: data._id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      name: file.name.split('.')[0],
-      lastScan: new Date().toLocaleDateString(),
-      ...data,
-      risk: data.grade >= 3 ? 'Critical' : data.grade >= 2 ? 'Medium' : 'Low'
+
+    const startData = await response.json()
+    let latest = formatDiagnosticPayload(startData, file)
+    onProgress?.(latest)
+
+    while (latest.status !== 'complete' && latest.status !== 'error') {
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      const statusResponse = await fetch(`http://localhost:8000/analyze/status/${latest.analysis_id}`)
+      if (!statusResponse.ok) {
+        throw new Error('Analysis status sync failed')
+      }
+      const statusData = await statusResponse.json()
+      latest = formatDiagnosticPayload(statusData, file)
+      onProgress?.(latest)
     }
-    
-    addPatientRecord(formatted)
-    return formatted
+
+    if (latest.status === 'error') {
+      throw new Error(latest.error || 'Staged analysis failed')
+    }
+
+    addPatientRecord(latest)
+    return latest
   }
 
   const handleDeleteRecord = async (recordId) => {
@@ -232,7 +252,7 @@ function App() {
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
               {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
               {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
-              {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />}
+              {/* {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />} */}
               {activePage === 'settings' && <SettingsPage />}
             </motion.div>
           </AnimatePresence>

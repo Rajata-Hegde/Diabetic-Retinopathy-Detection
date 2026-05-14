@@ -10,3 +10,7 @@ lime
 shap
 scikit-image
 grad-cam
+sentence-transformers
+faiss-cpu
+requests
+beautifulsoup4

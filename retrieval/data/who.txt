@@ -1,0 +1,7 @@
+source_url: https://www.who.int/news-room/fact-sheets/detail/diabetes
+source_title: WHO - Diabetes (fact sheet)
+
+(Extracted content)
+Key facts: rising global prevalence of diabetes; diabetes causes blindness, kidney failure, heart attacks, stroke and lower limb amputation. Prevention and treatment include healthy diet, physical activity, maintaining healthy weight, avoiding tobacco, and medical management. Diabetes can cause permanent vision loss by damaging blood vessels in the eyes. WHO provides guidance and global initiatives for diabetes prevention and care.
+
+References and WHO response section included. Last updated: 14 November 2024
