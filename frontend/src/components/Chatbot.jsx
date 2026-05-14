@@ -114,7 +114,7 @@ function getFallbackResponse(msg) {
 
   // Screening
   if (q.includes('screen') || q.includes('check') || q.includes('exam') || q.includes('test') || q.includes('diagnos'))
-    return 'DR Screening:\n\n🔍 Who should be screened?\n• Type 1 diabetes: within 5 years of diagnosis, then annually\n• Type 2 diabetes: at diagnosis, then annually\n• Pregnant diabetics: each trimester\n\n🏥 How is DR diagnosed?\n• Dilated fundus examination (gold standard)\n• Fundus photography (used in this platform)\n• Optical Coherence Tomography (OCT) — for macular edema\n• Fluorescein Angiography (FA) — maps blood vessel leakage\n\n🤖 This platform uses AI-powered fundus image analysis to grade DR severity automatically with ~93% accuracy.'
+    return 'DR Screening:\n\n🔍 Who should be screened?\n• Type 1 diabetes: within 5 years of diagnosis, then annually\n• Type 2 diabetes: at diagnosis, then annually\n• Pregnant diabetics: each trimester\n\n🏥 How is DR diagnosed?\n• Dilated fundus examination (gold standard)\n• Fundus photography (used in this platform)\n• Optical Coherence Tomography (OCT) — for macular edema\n• Fluorescein Angiography (FA) — maps blood vessel leakage\n\n🤖 This platform uses AI-powered fundus image analysis to grade DR severity.'
 
   // Referral
   if (q.includes('refer') || q.includes('specialist') || q.includes('urgent') || q.includes('emergency'))

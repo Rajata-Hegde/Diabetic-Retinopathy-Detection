@@ -100,11 +100,11 @@ function HomePage({ onStartAnalysis, onViewDashboard, stats }) {
         >
           <div className="relative z-10 rounded-[32px] border border-white/10 bg-black/40 p-3 backdrop-blur-3xl shadow-2xl overflow-hidden group">
              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-             <img 
+             {/* <img 
                src="https://images.unsplash.com/photo-1579154204601-01588f351e67?q=80&w=2070&auto=format&fit=crop" 
                alt="Diagnostic UI"
                className="rounded-3xl h-[500px] w-full object-cover opacity-80"
-             />
+             /> */}
              <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="flex items-center gap-4 text-white">
                   <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center">

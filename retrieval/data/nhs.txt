@@ -1,0 +1,9 @@
+source_url: https://www.nhs.uk/conditions/diabetic-retinopathy/
+source_title: NHS - Diabetic retinopathy
+
+(Extracted content)
+Diabetic retinopathy does not usually have any symptoms at first. It's usually found when you go to your diabetic eye screening appointments. In later stages, symptoms include blurred vision, floaters, and sight loss.
+
+Screening: invited every 1-2 years for people with diabetes aged 12+, photos of the back of the eye are taken. Stages: background, pre-proliferative, proliferative. Treatments: laser photocoagulation, anti-VEGF injections, steroid implants, surgery. Focus on monitoring and prevention through diabetes control.
+
+Page last reviewed: 17 July 2025
