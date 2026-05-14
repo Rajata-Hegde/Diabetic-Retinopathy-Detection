@@ -66,6 +66,71 @@ function UploadAnalyzePage({ onAnalyze }) {
 
   const isComplete = result?.status === 'complete' || analysisStage === 'complete'
 
+  const getAnalyzedSuggestions = (data) => {
+    if (data.suggestions && data.suggestions.length > 0) return data.suggestions;
+
+    const grade = parseInt(data.grade);
+    let advice = [];
+
+    switch (grade) {
+      case 0:
+        advice = [
+          "Maintain routine annual diabetic eye screening schedule.",
+          "Continue optimal glycemic and blood pressure control.",
+          "Educate patient on importance of regular eye checkups.",
+          "No immediate ophthalmological referral required for DR."
+        ];
+        break;
+      case 1:
+        advice = [
+          "Schedule follow-up diabetic eye screening in 12 months.",
+          "Optimize metabolic control (HbA1c, BP, Lipids) to prevent progression.",
+          "Refer to primary care for intensive risk factor management.",
+          "Provide patient education on early retinopathy signs."
+        ];
+        break;
+      case 2:
+        advice = [
+          "Refer to an ophthalmologist for a dilated fundus examination.",
+          "Consider specialist follow-up within 6 months to monitor progression.",
+          "Reinforce strict glycemic and blood pressure management.",
+          "Discuss potential for progression and treatment options."
+        ];
+        break;
+      case 3:
+        advice = [
+          "Urgent referral to a retina specialist (recommended within 4 weeks).",
+          "Requires comprehensive eye exam and likely OCT imaging.",
+          "High risk of progression to vision-threatening disease.",
+          "Intensive systemic management of diabetes and hypertension."
+        ];
+        break;
+      case 4:
+        advice = [
+          "Emergency referral to a retina specialist for immediate evaluation.",
+          "Consider urgent intervention (Anti-VEGF, Laser, or Surgery).",
+          "Extremely high risk of permanent vision loss if untreated.",
+          "Immediate coordination with the patient's multi-disciplinary care team."
+        ];
+        break;
+      default:
+        advice = [
+          "Refer to ophthalmology for specialist assessment.",
+          "Schedule dilated fundus exam to confirm diagnostic findings.",
+          "Document findings in EHR and notify primary care team."
+        ];
+    }
+
+    if (data.confidence < 75) {
+      advice.push("Correlate findings with clinical exam due to moderate model confidence.");
+    }
+    if (data.xai_agreement < 40) {
+      advice.push("Obtain multimodal imaging (OCT/FA) due to inconsistent XAI consensus.");
+    }
+
+    return advice;
+  };
+
   const printToPDF = () => {
     if (!result) return;
     const printWindow = window.open('', '_blank');
@@ -152,13 +217,7 @@ function UploadAnalyzePage({ onAnalyze }) {
             <div class="section-title">Suggested Next Steps</div>
             <div class="card">
               <ul style="margin:0;padding-left:16px;">
-                ${(result.suggestions && result.suggestions.length) ? result.suggestions.map(s => `<li>${s}</li>`).join('') : `
-                  <li>Refer to ophthalmology for specialist assessment.</li>
-                  <li>Schedule a dilated fundus exam and confirm imaging quality.</li>
-                  <li>Document findings in the patient's EHR and notify care team.</li>
-                  <li>Repeat imaging or obtain multimodal imaging if evidence is inconclusive.</li>
-                  <li>Consider referral pathways for urgent treatment if indicated.</li>
-                `}
+                ${getAnalyzedSuggestions(result).map(s => `<li>${s}</li>`).join('')}
               </ul>
             </div>
           </div>
@@ -221,6 +280,7 @@ function UploadAnalyzePage({ onAnalyze }) {
       </div>
     );
   }
+
 
   return (
     <div className="relative min-h-[85vh] rounded-[48px] overflow-hidden">
@@ -364,9 +424,12 @@ function UploadAnalyzePage({ onAnalyze }) {
                       ))}
                     </div>
                   </div>
-                  <div className="relative aspect-square rounded-[54px] bg-black border border-white/10 overflow-hidden shadow-2xl">
+                  <div className="relative aspect-square rounded-[54px] bg-[#000105] border border-white/10 overflow-hidden shadow-2xl group/img">
                     {result.images?.[activeXai] ? (
-                      <img src={`data:image/jpeg;base64,${result.images[activeXai]}`} className="h-full w-full object-contain" />
+                      <img 
+                        src={`data:image/jpeg;base64,${result.images[activeXai]}`} 
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105" 
+                      />
                     ) : (
                       <div className="flex flex-col h-full items-center justify-center gap-4">
                         <RefreshCcw size={32} className="text-slate-800 animate-spin" />
@@ -403,9 +466,6 @@ function UploadAnalyzePage({ onAnalyze }) {
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Model Confidence</p>
                       <div className="flex items-baseline gap-4">
                         <h4 className="text-5xl font-black text-white tracking-tighter">{(result.confidence ?? '--')}%</h4>
-                        {!isComplete && (
-                          <span className="text-sm font-semibold text-slate-400">Provisional</span>
-                        )}
                       </div>
                       <p className="text-[10px] font-bold text-emerald-400 mt-2">VLM Alignment: {(result.vlm_alignment || 'pending').toUpperCase()}</p>
                     </div>
@@ -418,7 +478,7 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                     <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
                       {result.patient_report ? formatText(result.patient_report) : (
-                        <p className="text-sm text-slate-500 font-semibold">Patient-friendly summary is being generated...</p>
+                        <p className="text-sm text-slate-500 font-semibold">Summary being generated...</p>
                       )}
                     </div>
                   </div>
@@ -426,11 +486,19 @@ function UploadAnalyzePage({ onAnalyze }) {
                   <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
                     <div className="flex items-center gap-3 mb-4">
                       <Activity size={16} className="text-sky-400" />
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings (concise)</span>
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings</span>
                     </div>
-                    <div className="max-h-40 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
+                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
                       {result.clinical_audit ? (
-                        result.clinical_audit.split('\n').slice(0, 5).map((l, i) => <div key={i}>{l}</div>)
+                        result.clinical_audit.split('\n').map((line, i) => {
+                          if (!line.trim()) return null;
+                          const formatted = line
+                            .replace(/^(.*?):/, '<strong class="text-sky-400">$1:</strong>')
+                            .replace(/(Exudates|Hemorrhages|Microaneurysms|Neovascularization|Cotton wool spots|Macula|Optic Disc)/gi, '<span class="text-white font-bold">$1</span>');
+                          return (
+                            <div key={i} className="mb-2 last:mb-0 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
+                          )
+                        })
                       ) : (
                         <div className="text-sm text-slate-500">Clinical findings will appear after VLM completes.</div>
                       )}
@@ -443,35 +511,16 @@ function UploadAnalyzePage({ onAnalyze }) {
                       <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
                     </div>
                     <div className="text-sm text-slate-300">
-                      {result.suggestions && result.suggestions.length ? (
-                        <ul className="list-disc pl-5 space-y-1">{result.suggestions.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                      ) : (
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Refer to ophthalmology for specialist assessment.</li>
-                          <li>Schedule a dilated fundus exam and confirm imaging quality.</li>
-                          <li>Document findings in the patient's EHR and notify the care team.</li>
-                          <li>Repeat imaging or obtain multimodal imaging if evidence is inconclusive.</li>
-                          <li>Consider urgent referral pathways if severe pathology suspected.</li>
-                        </ul>
-                      )}
+                      <ul className="list-disc pl-5 space-y-1">
+                        {getAnalyzedSuggestions(result).map((s, i) => (
+                          <li key={i} className={s.includes('Urgent') || s.includes('Emergency') ? 'text-rose-400 font-bold' : ''}>
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
 
-                  <div className="premium-glass p-8 rounded-[40px] border border-white/5 bg-gradient-to-br from-sky-500/10 to-transparent">
-                    <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Diagnostic Integrity</h4>
-                    <div className="space-y-3">
-                      {[
-                        { label: 'Classifier Confidence', val: `${result.confidence ?? '--'}%` },
-                        { label: 'XAI Agreement', val: `${result.xai_agreement ?? '--'}%` },
-                        { label: 'VLM Alignment', val: (result.vlm_alignment || 'pending').toUpperCase() }
-                      ].map(s => (
-                        <div key={s.label} className="flex justify-between items-center text-[10px] font-bold">
-                          <span className="text-slate-500">{s.label}</span>
-                          <span className="text-sky-400">{s.val}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </div>
             </motion.div>
