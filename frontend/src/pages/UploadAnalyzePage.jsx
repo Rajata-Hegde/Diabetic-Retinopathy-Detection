@@ -89,15 +89,9 @@ function UploadAnalyzePage({ onAnalyze }) {
           </div>
 
           <div class="grid">
-            <div class="card">
+            <div class="card" style="grid-column: span 2;">
               <div class="section-title">Predicted Severity</div>
               <div class="value">Grade ${result.grade}</div>
-              <div style="font-size: 12px; font-weight: 700; color: #0ea5e9; margin-top: 5px;">Model Confidence: ${result.confidence}%</div>
-            </div>
-            <div class="card">
-              <div class="section-title">XAI Agreement</div>
-              <div class="value">85.0%</div>
-              <div style="font-size: 12px; font-weight: 700; color: #6366f1; margin-top: 5px;">Consensus Match</div>
             </div>
           </div>
 
@@ -345,7 +339,7 @@ function UploadAnalyzePage({ onAnalyze }) {
 
                  {/* Report Content */}
                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1">
                        <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
                           <div className="absolute top-0 right-0 p-4 text-sky-500/10">
                              <Activity size={60} />
@@ -357,14 +351,6 @@ function UploadAnalyzePage({ onAnalyze }) {
                              {result.grade_name || `Grade ${result.grade}`}
                           </h4>
                           <p className="text-[10px] font-bold text-sky-400 mt-2">Classified as {result.risk}</p>
-                       </div>
-                       <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-4 text-emerald-500/10">
-                             <Globe size={60} />
-                          </div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">System Accuracy</p>
-                          <h4 className="text-5xl font-black text-white tracking-tighter">{result.confidence}%</h4>
-                          <p className="text-[10px] font-bold text-emerald-400 mt-2">Model Confidence</p>
                        </div>
                     </div>
 
@@ -382,8 +368,7 @@ function UploadAnalyzePage({ onAnalyze }) {
                        <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Diagnostic Integrity</h4>
                        <div className="space-y-3">
                           {[
-                            { label: 'Neural Precision', val: '99.2%' },
-                            { label: 'Latency', val: '1.2s' },
+                            { label: 'Latency', val: `${result.latency}s` },
                             { label: 'Auth Status', val: 'Verified' }
                           ].map(s => (
                             <div key={s.label} className="flex justify-between items-center text-[10px] font-bold">

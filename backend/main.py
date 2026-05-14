@@ -164,8 +164,6 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
 
     DIAGNOSTIC CONTEXT:
     - AI Prediction: {grade_name}
-    - Confidence Score: {confidence:.1f}%
-    - Agreement Score: {agreement_score*100:.1f}%
 
     PART 1: [CLINICAL_AUDIT]
     (Key: Value pairs for doctors)
@@ -247,7 +245,11 @@ async def analyze_image(file: UploadFile = File(...)):
         predicted_class = int(np.argmax(probs))
         confidence = float(np.max(probs))
         dr_grades = ["No DR", "Mild DR", "Moderate DR", "Severe DR", "Proliferative DR"]
+        dr_risks = ["Low Risk", "Moderate Risk", "High Risk", "Critical Risk", "Emergency"]
         grade_name = dr_grades[predicted_class]
+        risk_level = dr_risks[predicted_class]
+        
+        start_time = datetime.utcnow()
 
         # 3. XAI Suite
         # Grad-CAM
@@ -272,8 +274,12 @@ async def analyze_image(file: UploadFile = File(...)):
         consensus_mask = np.mean([m_grad, m_lime, m_shap], axis=0)
         consensus_viz = show_cam_on_image(np.float32(img_np)/255, consensus_mask, use_rgb=True)
         
+        # Calculate a pseudo agreement score based on mask overlap (simplified)
+        agreement_score = float(np.mean(consensus_mask > 0.5))
+        latency = (datetime.utcnow() - start_time).total_seconds()
+
         # 4. AI Report
-        ai_response = get_gemini_explanation(image, Image.fromarray(consensus_viz), grade_name, confidence*100, ["Grad-CAM", "LIME", "SHAP"], 0.85)
+        ai_response = get_gemini_explanation(image, Image.fromarray(consensus_viz), grade_name, confidence*100, ["Grad-CAM", "LIME", "SHAP"], agreement_score)
         
         clinical_audit = ""
         patient_report = ""
@@ -291,7 +297,8 @@ async def analyze_image(file: UploadFile = File(...)):
             "filename": file.filename,
             "grade": predicted_class,
             "grade_name": grade_name,
-            "confidence": round(confidence * 100, 2),
+            "risk": risk_level,
+            "latency": round(latency, 2),
             "clinical_audit": clinical_audit,
             "patient_report": patient_report,
             "images": {
