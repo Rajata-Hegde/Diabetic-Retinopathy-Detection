@@ -60,7 +60,7 @@ function UploadAnalyzePage({ onAnalyze }) {
     idle: 'Ready',
     decision: 'Decision ready. Generating explainability maps...',
     xai: 'XAI projections are being rendered...',
-    vlm: 'Generating clinical and patient narratives...',
+    vlm: 'Generating report...',
     complete: 'Scan finalized'
   }
 
@@ -442,29 +442,11 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                   </div>
 
-                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                    <div className="flex items-center gap-3 mb-4">
-                      <BrainCircuit size={16} className="text-sky-400" />
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Next Steps</span>
-                    </div>
-                    <div className="text-sm text-slate-300">
-                      {isComplete ? (
-                        <ul className="list-disc pl-5 space-y-1">
-                          {getAnalyzedSuggestions(result).map((s, i) => (
-                            <li key={i} className={s.includes('Urgent') || s.includes('Emergency') ? 'text-rose-400 font-bold' : ''}>
-                              {s}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-sm text-slate-500">Suggested steps will be finalized after full analysis.</div>
-                      )}
-                    </div>
-                  </div>
+
                 </div>
 
                 {/* Report Content */}
-                <div className="space-y-8">
+                <div className="flex flex-col h-full space-y-8 min-h-[800px]">
                   <div className="grid grid-cols-2 gap-6">
                     <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 text-sky-500/10">
@@ -489,15 +471,15 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                   </div>
 
-                  <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-6">
+                  <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden flex-1 min-h-0 flex flex-col">
+                    <div className="flex items-center gap-3 mb-6 shrink-0">
                       <Sparkles size={20} className="text-sky-400" />
-                      {/* <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Automated Patient Narrative</span> */}
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical Audit Report</span>
                     </div>
-                    <div className="text-lg text-slate-300 leading-relaxed font-medium space-y-4">
-                      {result.patient_report ? formatText(result.patient_report) : (
-                        <p className="text-sm text-slate-500 font-semibold">Summary being generated...</p>
-                      )}
+                    <div className="premium-glass p-6 rounded-[32px] border border-white/10 bg-black/40 flex-1 overflow-y-auto custom-scrollbar">
+                      <pre className="text-[13px] text-sky-200 leading-relaxed font-mono whitespace-pre-wrap break-words">
+                        {result.patient_report || "Report being finalized..."}
+                      </pre>
                     </div>
                   </div>
 

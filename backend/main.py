@@ -417,9 +417,9 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
         return out
 
     prompt = f"""
-    You are a Senior Ophthalmic AI Specialist working under strict hallucination controls.
-    Analyze the retinal image first, then analyze the provided XAI consensus heatmap to cross-check findings.
-
+    You are a cautious Ophthalmic AI Specialist.
+    Analyze the retinal fundus image and the XAI heatmap to produce a concise "Retinal Fundus Analysis Report".
+    
     DIAGNOSTIC CONTEXT:
     - AI Prediction: {grade_name}
     - Confidence Score: {confidence:.1f}%
@@ -427,17 +427,47 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
     - XAI Methods: {", ".join(methods)}
     - XAI Summary: {xai_text or 'N/A'}
 
-    HARD CONSTRAINTS:
-    1) Use only findings visible in the image or supported by the heatmap.
-    2) Never invent patient demographics, history, treatment plan, or lab values.
-    3) If uncertain, say "Insufficient visual evidence".
-    4) Keep patient summary <= 80 words.
+    CONSTRAINTS:
+    1) REDUCE VERBOSITY: Use short, punchy bullet points. No conversational filler.
+    2) REDUCE OVER-CERTAINTY: Use terms like "appears consistent with", "suggestive of", or "possible". Avoid "definitive" unless unmistakable.
+    3) IMPROVE CONSISTENCY: Ensure your findings align with the AI Confidence and XAI Agreement score provided.
+    4) AVOID UNSUPPORTED QUANTIFICATION: Do not provide exact lesion counts unless you are 100% sure. Use "Multiple", "Few", or "None visible".
+    5) CONSTRAIN RECOMMENDATIONS: Stick to "Specialist evaluation recommended" or "Routine follow-up". No specific treatment or surgical advice.
+
+    TEMPLATE (KEEP IT COMPACT):
+    --------------------------------------------------
+    Retinal Fundus Analysis Report
+    --------------------------------------------------
+    Predicted Stage: {grade_name} ({confidence:.1f}% Confidence)
+
+    Primary Evidence Regions:
+    • [Region 1]
+    • [Region 2]
+
+    Detected Lesions:
+    1. [Lesion Type]
+       - Distribution: [Distribution]
+       - Severity: [Low|Moderate|High]
+
+    Absent Findings:
+    • [Critical Finding 1]
+    • [Critical Finding 2]
+
+    Reasoning & Consensus:
+    [Max 2 sentences linking AI prediction to XAI overlap]
+
+    Interpretation Reliability:
+    • XAI Consensus: [Low|Medium|High]
+    • Localization: [Low|Medium|High]
+
+    Recommendation:
+    [Standard clinical recommendation]
+    --------------------------------------------------
 
     Return strict JSON only with this schema:
     {{
-      "clinical_findings": ["bullet 1", "bullet 2", "bullet 3"],
-      "patient_summary": "plain language summary",
-      "uncertainty_note": "where uncertainty exists",
+      "structured_report": "The full report string formatted exactly like the template above",
+      "clinical_findings": ["bullet 1", "bullet 2"],
       "evidence_alignment": "high|medium|low",
       "vlm_grade_hint": "No DR|Mild DR|Moderate DR|Severe DR|Proliferative DR|Unknown"
     }}
@@ -447,13 +477,21 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
     model_names = [m.replace('models/', '') for m in model_names]
     model_names = list(dict.fromkeys(model_names))
 
+    # Downsample for VLM to reduce latency while preserving diagnostic quality
+    vlm_image = image_pil.copy()
+    vlm_image.thumbnail((512, 512))
+    
+    vlm_heatmap = None
+    if heatmap_pil:
+        vlm_heatmap = heatmap_pil.copy()
+        vlm_heatmap.thumbnail((512, 512))
+
     for model_name in model_names:
         try:
             model_ai = genai.GenerativeModel(model_name)
-            content = [prompt, image_pil]
-            # Provide the original image first, then the heatmap, then the xai summary
-            if heatmap_pil:
-                content.append(heatmap_pil)
+            content = [prompt, vlm_image]
+            if vlm_heatmap:
+                content.append(vlm_heatmap)
             if xai_text:
                 content.append(xai_text)
 
@@ -497,7 +535,7 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
                 else:
                     clinical_audit = str(findings or "").strip()
 
-                patient_report = str(parsed.get("patient_summary") or "").strip()
+                patient_report = str(parsed.get("structured_report") or "").strip()
                 uncertainty_note = str(parsed.get("uncertainty_note") or "").strip()
                 evidence_alignment = str(parsed.get("evidence_alignment") or "unknown").strip().lower()
                 vlm_grade_hint_text = str(parsed.get("vlm_grade_hint") or "").strip()
