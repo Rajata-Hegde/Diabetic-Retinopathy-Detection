@@ -6,8 +6,6 @@ import HomePage from './pages/HomePage'
 import DashboardHome from './pages/DashboardHome'
 import UploadAnalyzePage from './pages/UploadAnalyzePage'
 import PatientRecordsPage from './pages/PatientRecordsPage'
-// import AnalyticsPage from './pages/AnalyticsPage'
-import SettingsPage from './pages/SettingsPage'
 import Chatbot from './components/Chatbot'
 import './App.css'
 
@@ -235,8 +233,7 @@ function App() {
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
               {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
               {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
-              {/* {activePage === 'analytics' && <AnalyticsPage records={patientRecords} />} */}
-              {activePage === 'settings' && <SettingsPage />}
+
             </motion.div>
           </AnimatePresence>
         </div>

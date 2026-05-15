@@ -138,7 +138,7 @@ function getFallbackResponse(msg) {
 
   // Platform features
   if (q.includes('platform') || q.includes('dashboard') || q.includes('feature') || q.includes('upload') || q.includes('record'))
-    return 'DiabEYEtic Insight Platform Features:\n\n📊 Dashboard: Real-time statistics — scans today, urgent cases, pending reviews.\n\n📤 Upload & Analyze: Upload retinal fundus images → AI grades DR severity (0–4) instantly.\n\n👥 Patient Records: Full patient history with scan timelines and grade progression.\n\n📈 Analytics: Weekly scan volume, severity distribution, model accuracy trends.\n\n⚙️ Settings: Customize screening protocols and notification thresholds.\n\n🤖 RetinAI (me!): AI assistant for clinical guidance and DR education.'
+    return 'DiabEYEtic Insight Platform Features:\n\n📊 Dashboard: Real-time statistics — scans today, urgent cases, pending reviews.\n\n📤 Upload & Analyze: Upload retinal fundus images → AI grades DR severity (0–4) instantly.\n\n👥 Patient Records: Full patient history with scan timelines and grade progression.\n\n🤖 RetinAI (me!): AI assistant for clinical guidance and DR education.'
 
   // Default
   return 'I\'m RetinAI, your DR Clinical Assistant! I can help you with:\n\n• 🔬 DR grades (0–4) explained\n• 🩺 Symptoms & diagnosis\n• 💊 Treatments (laser, anti-VEGF, surgery)\n• 🛡️ Prevention strategies\n• 🤖 How the AI detection model works\n• 📋 When to refer patients\n• 👁️ Macular edema & retinal findings\n\nTry asking: "What is Grade 3 NPDR?" or "When should I refer a patient?"'
