@@ -1,23 +1,29 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { Bell, Search, UserRound, LayoutDashboard, UploadCloud, BarChart3, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { navItems } from './data/mockData'
+import { useAuth } from './lib/AuthContext'
+import Login from './components/Login'
+import Register from './components/Register'
 import HomePage from './pages/HomePage'
 import DashboardHome from './pages/DashboardHome'
 import UploadAnalyzePage from './pages/UploadAnalyzePage'
 import PatientRecordsPage from './pages/PatientRecordsPage'
+import SettingsPage from './pages/SettingsPage'
 import Chatbot from './components/Chatbot'
 import './App.css'
 
 function App() {
+  const { user, loading, signOut, getUserName } = useAuth()
+  const [authView, setAuthView] = useState('login')
   const [activePage, setActivePage] = useState('home')
   const [searchTerm, setSearchTerm] = useState('')
   const [patientRecords, setPatientRecords] = useState([])
   const [appStats, setAppStats] = useState([
     { title: 'Scans Today', value: '0', icon: UploadCloud },
     { title: 'High Risk Cases', value: '0', icon: Bell },
-    // { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
   ])
+  const [redirectToHome, setRedirectToHome] = useState(false)
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -25,7 +31,6 @@ function App() {
         const response = await fetch('http://localhost:8000/records')
         if (response.ok) {
           const data = await response.json()
-          // Map backend fields to frontend record format
           const formatted = data.map(r => ({
             id: r._id,
             name: r.filename.split('.')[0] || 'Anonymous',
@@ -38,7 +43,6 @@ function App() {
         }
       } catch (err) {
         console.error("Failed to sync with Diagnostic Vault:", err)
-        // Fallback to local if backend is unreachable
         const saved = localStorage.getItem('retina_records')
         if (saved) setPatientRecords(JSON.parse(saved))
       }
@@ -51,16 +55,20 @@ function App() {
     const today = new Date().toLocaleDateString()
     const todayScans = patientRecords.filter(r => r.lastScan === today).length
     const urgentCases = patientRecords.filter(r => r.risk === 'Critical' || r.risk === 'High').length
-
     setAppStats([
       { title: 'Scans Today', value: todayScans.toString(), icon: UploadCloud },
       { title: 'High Risk Cases', value: urgentCases.toString(), icon: Bell },
-      // { title: 'Accuracy', value: '93.1%', icon: BarChart3 },
     ])
   }, [patientRecords])
 
-  const pageTitle = navItems.find((item) => item.key === activePage)?.label ?? 'Dashboard'
+  useEffect(() => {
+    if (redirectToHome && user) {
+      setActivePage('home')
+      setRedirectToHome(false)
+    }
+  }, [redirectToHome, user])
 
+  const pageTitle = navItems.find((item) => item.key === activePage)?.label ?? 'Dashboard'
 
   const searchedRecords = useMemo(() => {
     return patientRecords.filter((item) =>
@@ -73,7 +81,7 @@ function App() {
   }
 
   const formatDiagnosticPayload = (data, file) => ({
-    id: data._id || data.analysis_id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    id: data._id || data.analysis_id || 'RC-' + Math.random().toString(36).substring(2, 11).toUpperCase(),
     analysis_id: data.analysis_id,
     status: data.status,
     name: file.name.split('.')[0],
@@ -82,7 +90,7 @@ function App() {
     risk: data.grade >= 3 ? 'Critical' : data.grade >= 2 ? 'Medium' : 'Low'
   })
 
-  const handleDiagnosticAnalysis = async (file, onProgress) => {
+  const handleDiagnosticAnalysis = useCallback(async (file, onProgress) => {
     const formData = new FormData()
     formData.append('file', file)
 
@@ -114,9 +122,9 @@ function App() {
 
     addPatientRecord(latest)
     return latest
-  }
+  }, [])
 
-  const handleDeleteRecord = async (recordId) => {
+  const handleDeleteRecord = useCallback(async (recordId) => {
     try {
       const response = await fetch(`http://localhost:8000/records/${recordId}`, { method: 'DELETE' })
       if (response.ok) {
@@ -127,6 +135,28 @@ function App() {
       console.error("Failed to delete record:", err)
     }
     return false
+  }, [])
+
+  const handleSignOut = useCallback(async () => {
+    await signOut()
+    setActivePage('home')
+    setAuthView('login')
+  }, [signOut])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sky-500" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return authView === 'login' ? (
+      <Login onSwitchToRegister={() => setAuthView('register')} onSuccess={() => setRedirectToHome(true)} />
+    ) : (
+      <Register onSwitchToLogin={() => setAuthView('login')} onSuccess={() => setRedirectToHome(true)} />
+    )
   }
 
   return (
@@ -174,7 +204,10 @@ function App() {
           </nav>
 
           <div className="mt-auto space-y-6">
-            <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
+            <button
+              onClick={handleSignOut}
+              className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300"
+            >
               <LogOut size={20} />
               <span className="font-bold tracking-tight text-sm">Sign Out</span>
             </button>
@@ -202,8 +235,8 @@ function App() {
 
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-white leading-none">Guest User</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Identity Verified</p>
+                <p className="text-sm font-bold text-white leading-none">{getUserName()}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Authenticated</p>
               </div>
               <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 p-[2px]">
                 <div className="h-full w-full rounded-[14px] bg-slate-900 flex items-center justify-center overflow-hidden">
@@ -233,7 +266,7 @@ function App() {
               {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
               {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
               {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
-
+              {activePage === 'settings' && <SettingsPage />}
             </motion.div>
           </AnimatePresence>
         </div>
