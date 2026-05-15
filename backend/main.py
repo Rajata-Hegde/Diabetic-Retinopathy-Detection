@@ -100,6 +100,18 @@ try:
 except Exception:
     HAS_RETRIEVAL = False
 
+try:
+    import certifi
+    HAS_CERTIFI = True
+except Exception:
+    HAS_CERTIFI = False
+
+try:
+    import dns.resolver
+    HAS_DNS = True
+except Exception:
+    HAS_DNS = False
+
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 # MongoDB Configuration
@@ -178,11 +190,24 @@ async def startup_event():
     discover_models()
     if MONGODB_URI:
         try:
-            db_client = AsyncIOMotorClient(MONGODB_URI)
+            if HAS_DNS:
+                try:
+                    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+                    dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1']
+                except Exception:
+                    pass
+
+            client_kwargs = {}
+            if HAS_CERTIFI:
+                client_kwargs["tlsCAFile"] = certifi.where()
+            
+            db_client = AsyncIOMotorClient(MONGODB_URI, **client_kwargs)
             db = db_client[DATABASE_NAME]
+            await db.command("ping")
             print(f"✅ Connected to MongoDB: {DATABASE_NAME}")
         except Exception as e:
             print(f"❌ MongoDB Connection Error: {e}")
+            db = None
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -617,15 +642,24 @@ def _generate_xai_bundle(image_data, predicted_class):
     except Exception:
         xai_summary = "agreement={:.3f}".format(agreement_score)
 
+    # Ensure XAI images match original aspect ratio for consistent UI rendering
+    orig_size = image.size # (width, height)
+    
+    def resize_to_original(img_array):
+        if HAS_CV2 and cv2 is not None:
+            return cv2.resize(img_array, orig_size, interpolation=cv2.INTER_LINEAR)
+        else:
+            return np.array(Image.fromarray(img_array.astype(np.uint8)).resize(orig_size, Image.BILINEAR))
+
     return {
         "consensus_viz": consensus_viz,
         "agreement_score": round(agreement_score, 4),
         "images": {
-            "original": encode_image(np.array(image.resize((400, 400)))),
-            "gradcam": encode_image(grad_viz),
-            "lime": encode_image(lime_viz),
-            "shap": encode_image(shap_viz),
-            "consensus": encode_image(consensus_viz),
+            "original": encode_image(np.array(image)),
+            "gradcam": encode_image(resize_to_original(grad_viz)),
+            "lime": encode_image(resize_to_original(lime_viz)),
+            "shap": encode_image(resize_to_original(shap_viz)),
+            "consensus": encode_image(resize_to_original(consensus_viz)),
         },
         "xai_summary": xai_summary,
     }

@@ -166,7 +166,7 @@ function UploadAnalyzePage({ onAnalyze }) {
             .section-title { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px; }
             .value { font-size: 24px; font-weight: 900; color: #0f172a; }
             .evidence-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #000; }
+            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 8px; background: #000; }
             .patient-note { font-style: italic; font-size: 14px; line-height: 1.6; color: #334155; background: #f0f9ff; padding: 20px; border-radius: 12px; border: 1px solid #bae6fd; }
             .footer { margin-top: 50px; font-size: 10px; color: #94a3b8; text-align: center; }
           </style>
@@ -426,9 +426,9 @@ function UploadAnalyzePage({ onAnalyze }) {
                   </div>
                   <div className="relative aspect-[4/3] rounded-[32px] bg-[#000000] border border-white/10 overflow-hidden shadow-2xl group/img flex items-center justify-center">
                     {result.images?.[activeXai] ? (
-                      <img 
-                        src={`data:image/jpeg;base64,${result.images[activeXai]}`} 
-                        className="max-h-full max-w-full object-contain transition-transform duration-700" 
+                      <img
+                        src={`data:image/jpeg;base64,${result.images[activeXai]}`}
+                        className="max-h-full max-w-full object-contain transition-transform duration-700"
                       />
                     ) : (
                       <div className="flex flex-col h-full items-center justify-center gap-4">
