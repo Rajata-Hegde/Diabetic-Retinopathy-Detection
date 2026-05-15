@@ -14,5 +14,9 @@ sentence-transformers
 faiss-cpu
 requests
 beautifulsoup4
-certifi
-dnspython
+sqlalchemy
+asyncpg
+psycopg2-binary
+google-generativeai
+gunicorn
+python-dotenv

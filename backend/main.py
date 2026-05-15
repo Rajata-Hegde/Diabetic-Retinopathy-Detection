@@ -112,18 +112,42 @@ try:
 except Exception:
     HAS_DNS = False
 
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import Column, String, Integer, Float, Text, Boolean, JSON, DateTime, select, delete
+from sqlalchemy.dialects.postgresql import JSONB
 
-# MongoDB Configuration
-MONGODB_URI = os.getenv("MONGODB_URI")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "RetinaCareDB")
-db_client = None
-db = None
+# Database Configuration
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
+engine = create_async_engine(DATABASE_URL) if DATABASE_URL else None
+AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False) if engine else None
+Base = declarative_base()
+
+class DiagnosticRecord(Base):
+    __tablename__ = "diagnostics"
+    id = Column(String, primary_key=True)
+    filename = Column(String)
+    timestamp = Column(String)
+    grade = Column(Integer)
+    grade_name = Column(String)
+    confidence = Column(Float)
+    clinical_audit = Column(Text)
+    patient_report = Column(Text)
+    xai_agreement = Column(Float)
+    vlm_alignment = Column(String)
+    review_required = Column(Boolean)
+    review_risk = Column(String)
+    review_reason = Column(Text)
+    images = Column(JSONB)
+    suggestions = Column(JSONB)
+    sources = Column(JSONB)
 
 # Gemini Configuration
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"), transport='rest')
-
-# Global variable to store discovered models
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"), transport='rest')
 AVAILABLE_MODELS = []
 
 # In-memory staged analysis cache
@@ -185,34 +209,17 @@ transform = transforms.Compose([
 
 @app.on_event("startup")
 async def startup_event():
-    global db_client, db
     load_model()
     discover_models()
-    if MONGODB_URI:
-        try:
-            if HAS_DNS:
-                try:
-                    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
-                    dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1']
-                except Exception:
-                    pass
-
-            client_kwargs = {}
-            if HAS_CERTIFI:
-                client_kwargs["tlsCAFile"] = certifi.where()
-            
-            db_client = AsyncIOMotorClient(MONGODB_URI, **client_kwargs)
-            db = db_client[DATABASE_NAME]
-            await db.command("ping")
-            print(f"✅ Connected to MongoDB: {DATABASE_NAME}")
-        except Exception as e:
-            print(f"❌ MongoDB Connection Error: {e}")
-            db = None
+    if engine:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ PostgreSQL Tables Created")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    if db_client:
-        db_client.close()
+    if engine:
+        await engine.dispose()
 
 # --- XAI Handlers ---
 
@@ -717,27 +724,30 @@ async def _run_staged_pipeline(job_id, image_data, filename, predicted_class, co
             "suggestions": ai_response.get('suggestions') if isinstance(ai_response, dict) else [],
         }
 
-        if db is not None:
-            insert_result = await db.diagnostics.insert_one(result_payload)
-            result_payload["_id"] = str(insert_result.inserted_id)
-            print(f"💾 Record saved to MongoDB for {filename}")
-
-        # Log analytics entry for evaluation
-        try:
-            analytics_doc = {
-                "analysis_id": job_id,
-                "timestamp": datetime.utcnow().isoformat(),
-                "grade": predicted_class,
-                "vlm_grade_hint": vlm_grade_hint,
-                "confidence": round(confidence * 100, 2),
-                "xai_agreement": xai_bundle["agreement_score"],
-                "vlm_alignment": vlm_alignment,
-                "model_vlm_contradiction": guardrails["model_vlm_contradiction"],
-            }
-            if db is not None:
-                await db.analytics.insert_one(analytics_doc)
-        except Exception:
-            pass
+        if AsyncSessionLocal:
+            async with AsyncSessionLocal() as session:
+                record = DiagnosticRecord(
+                    id=job_id,
+                    filename=filename,
+                    timestamp=result_payload["timestamp"],
+                    grade=predicted_class,
+                    grade_name=grade_name,
+                    confidence=result_payload["confidence"],
+                    clinical_audit=clinical_audit,
+                    patient_report=patient_report,
+                    xai_agreement=result_payload["xai_agreement"],
+                    vlm_alignment=vlm_alignment,
+                    review_required=guardrails["review_required"],
+                    review_risk=guardrails["review_risk"],
+                    review_reason=guardrails["review_reason"],
+                    images=xai_bundle["images"],
+                    suggestions=result_payload["suggestions"],
+                    sources=result_payload["sources"]
+                )
+                session.add(record)
+                await session.commit()
+                result_payload["_id"] = job_id
+                print(f"💾 Record saved to PostgreSQL for {filename}")
 
         _set_job(
             job_id,
@@ -762,64 +772,50 @@ async def _run_staged_pipeline(job_id, image_data, filename, predicted_class, co
 async def read_root():
     return {
         "status": "Online", 
-        "database": "Connected" if db is not None else "Disconnected",
+        "database": "PostgreSQL Connected" if engine else "Disconnected",
         "model": "Loaded" if model is not None else "Error"
     }
 
 @app.get("/records")
 async def get_records():
-    if db is None:
+    if not AsyncSessionLocal:
         return []
     try:
-        cursor = db.diagnostics.find().sort("timestamp", -1).limit(50)
-        records = []
-        async for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            records.append(doc)
-        return records
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post('/analytics/log')
-async def log_analytics(entry: dict):
-    """Accepts a JSON analytics entry and stores it in the database for later analysis."""
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database disconnected")
-    try:
-        entry['received_at'] = datetime.utcnow().isoformat()
-        await db.analytics.insert_one(entry)
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get('/analytics/stats')
-async def analytics_stats():
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database disconnected")
-    try:
-        pipeline = [
-            {"$group": {"_id": None, "avg_xai_agreement": {"$avg": "$xai_agreement"}, "count": {"$sum": 1}}}
-        ]
-        cursor = db.analytics.aggregate(pipeline)
-        stats = await cursor.to_list(length=10)
-        if stats:
-            s = stats[0]
-            return {"count": s.get('count', 0), "avg_xai_agreement": s.get('avg_xai_agreement', None)}
-        return {"count": 0, "avg_xai_agreement": None}
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(DiagnosticRecord).order_by(DiagnosticRecord.timestamp.desc()).limit(50))
+            records = result.scalars().all()
+            return [
+                {
+                    "_id": r.id,
+                    "filename": r.filename,
+                    "timestamp": r.timestamp,
+                    "grade": r.grade,
+                    "grade_name": r.grade_name,
+                    "confidence": r.confidence,
+                    "clinical_audit": r.clinical_audit,
+                    "patient_report": r.patient_report,
+                    "xai_agreement": r.xai_agreement,
+                    "vlm_alignment": r.vlm_alignment,
+                    "review_required": r.review_required,
+                    "review_risk": r.review_risk,
+                    "review_reason": r.review_reason,
+                    "images": r.images,
+                    "suggestions": r.suggestions,
+                    "sources": r.sources
+                } for r in records
+            ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/records/{record_id}")
 async def delete_record(record_id: str):
-    if db is None:
+    if not AsyncSessionLocal:
         raise HTTPException(status_code=500, detail="Database disconnected")
     try:
-        result = await db.diagnostics.delete_one({"_id": ObjectId(record_id)})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Record not found")
-        return {"status": "success", "message": "Record deleted"}
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(DiagnosticRecord).where(DiagnosticRecord.id == record_id))
+            await session.commit()
+            return {"status": "success", "message": "Record deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
