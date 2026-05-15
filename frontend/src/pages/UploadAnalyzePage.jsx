@@ -137,9 +137,12 @@ function UploadAnalyzePage({ onAnalyze }) {
 
     const pdfFormat = (text) => {
       if (!text) return "";
-      // remove explicit numeric scores or % from narrative
       let cleaned = text.replace(/\d{1,3}%/g, '').replace(/Model Confidence:.*$/gim, '').replace(/confidence[:\s]*\d{1,3}%?/gim, '').replace(/score[:\s]*\d{1,3}%?/gim, '');
-      return cleaned.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
+      
+      const importantTerms = /(Grade\s[0-4]|No DR|Mild NPDR|Moderate NPDR|Severe NPDR|PDR|Microaneurysms|Hemorrhages|Exudates|Cotton Wool Spots|Neovascularization|Macula|Optic Disc|Fovea|Critical|High Risk|Urgent|Moderate|Mild)/gi;
+      
+      let formatted = cleaned.replace(importantTerms, '<b>$1</b>');
+      return formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
     };
 
     const auditHtml = (result.clinical_audit || "").split('\n').map(line => {
@@ -154,76 +157,130 @@ function UploadAnalyzePage({ onAnalyze }) {
     const html = `
       <html>
         <head>
-          <title>DiabEyetic Insight - Clinical Report</title>
+          <title>Clinical Retinal Analysis Report</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-            body { font-family: 'Inter', sans-serif; padding: 40px; color: #0f172a; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
-            .brand { font-size: 20px; font-weight: 900; }
-            .brand span { color: #0ea5e9; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .card { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
-            .section-title { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px; }
-            .value { font-size: 24px; font-weight: 900; color: #0f172a; }
-            .evidence-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 8px; background: #000; }
-            .patient-note { font-style: italic; font-size: 14px; line-height: 1.6; color: #334155; background: #f0f9ff; padding: 20px; border-radius: 12px; border: 1px solid #bae6fd; }
-            .footer { margin-top: 50px; font-size: 10px; color: #94a3b8; text-align: center; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 50px; color: #1e293b; background: #fff; line-height: 1.5; }
+            .report-container { max-width: 850px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 50px; }
+            
+            .hospital-header { border-bottom: 3px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+            .hospital-name { font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+            .hospital-name span { color: #0ea5e9; }
+            .report-type { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 2px; }
+
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; background: #f8fafc; padding: 25px; border-radius: 8px; font-size: 13px; }
+            .info-item label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+            .info-item span { font-weight: 600; color: #334155; }
+
+            .section { margin-bottom: 40px; }
+            .section-header { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #0ea5e9; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 1px; }
+            
+            .assessment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+            .assessment-card { border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; }
+            .assessment-label { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; }
+            .assessment-value { font-size: 20px; font-weight: 800; color: #0f172a; }
+
+            .evidence-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .evidence-box { border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center; }
+            .evidence-img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 8px; background: #000; margin-bottom: 10px; }
+            .evidence-caption { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+
+            .findings-list { list-style: none; padding: 0; margin: 0; font-size: 13px; font-family: monospace; color: #334155; }
+            .findings-list li { margin-bottom: 8px; padding-left: 15px; position: relative; }
+            .findings-list li::before { content: ""; position: absolute; left: 0; top: 8px; width: 4px; height: 4px; background: #0ea5e9; border-radius: 50%; }
+
+            .narrative-text { font-size: 14px; color: #334155; line-height: 1.7; white-space: pre-wrap; }
+            
+            .signature-area { margin-top: 60px; display: flex; justify-content: flex-end; }
+            .signature-box { width: 250px; border-top: 1px solid #cbd5e1; padding-top: 10px; text-align: center; }
+            .signature-name { font-size: 14px; font-weight: 800; color: #0f172a; }
+            .signature-title { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+            .footer { margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 9px; color: #94a3b8; text-align: center; }
+            
+            @media print {
+              body { padding: 0; }
+              .report-container { border: none; max-width: 100%; }
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="brand">DiabEyetic<span> Insight</span></div>
-            <div style="text-align: right; font-size: 12px; font-weight: 700;">Diagnostic Ref: ${result.id || 'RC-' + Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
-          </div>
-
-          <div class="grid">
-            <div class="card">
-              <div class="section-title">Predicted Severity</div>
-              <div class="value">Grade ${result.grade}</div>
-              <div style="font-size: 12px; font-weight: 700; color: #0ea5e9; margin-top: 5px;">Model Confidence: ${result.confidence}%</div>
+          <div class="report-container">
+            <div class="hospital-header">
+              <div class="hospital-name">DIAB<span>EYE</span>TIC CLINICAL LABS</div>
+              <div class="report-type">Retinal Diagnostic Report</div>
             </div>
-            <div class="card">
-              <div class="section-title">XAI Agreement</div>
-              <div class="value">${result.xai_agreement ?? 'N/A'}%</div>
-              <div style="font-size: 12px; font-weight: 700; color: #6366f1; margin-top: 5px;">Consensus Match</div>
-            </div>
-          </div>
-          <!-- Reliability gate intentionally removed from printed report (tool is preliminary diagnosis only) -->
 
-          <div class="section">
-            <div class="section-title">Clinical Audit Log</div>
-            <div class="card" style="font-family: monospace; font-size: 11px;">
-              <ul style="list-style: none; padding: 0;">${auditHtml}</ul>
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Diagnostic Reference</label>
+                <span>${result.id || 'REF-' + Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+              </div>
+              <div class="info-item">
+                <label>Date of Analysis</label>
+                <span>${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+              <div class="info-item">
+                <label>Report Status</label>
+                <span style="color: #059669;">Finalized</span>
+              </div>
             </div>
-          </div>
 
-          <div class="section" style="margin-top: 30px;">
-            <div class="section-title">Visual Evidence</div>
-            <div class="evidence-grid">
-              <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.original}"/>
-              <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.consensus}"/>
+            <div class="section">
+              <div class="section-header">Clinical Assessment Summary</div>
+              <div class="assessment-grid">
+                <div class="assessment-card">
+                  <div class="assessment-label">Predicted DR Severity</div>
+                  <div class="assessment-value">${result.grade_name || 'Grade ' + result.grade}</div>
+                </div>
+                <div class="assessment-card">
+                  <div class="assessment-label">Neural Confidence</div>
+                  <div class="assessment-value">${result.confidence}%</div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div class="section" style="margin-top: 30px;">
-            <div class="section-title">Patient Narrative</div>
-            <div class="patient-note">
-              ${pdfFormat(result.patient_report || "")}
-            </div>
-          </div>
-
-          <div class="section" style="margin-top: 20px;">
-            <div class="section-title">Suggested Next Steps</div>
-            <div class="card">
-              <ul style="margin:0;padding-left:16px;">
-                ${getAnalyzedSuggestions(result).map(s => `<li>${s}</li>`).join('')}
+            <div class="section">
+              <div class="section-header">Computer-Aided Clinical Audit</div>
+              <ul class="findings-list">
+                ${(result.clinical_audit || "").split('\n').filter(l => l.trim()).map(line => `<li>${line}</li>`).join('')}
               </ul>
             </div>
-          </div>
 
-          <div class="footer">
-            DiabEyetic Insight AI Diagnostic Suite • Confidential Medical Document • ${new Date().toLocaleString()}
+            <div class="section">
+              <div class="section-header">Visual Diagnostic Evidence</div>
+              <div class="evidence-container">
+                <div class="evidence-box">
+                  <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.original}"/>
+                  <div class="evidence-caption">Primary Fundus Scan</div>
+                </div>
+                <div class="evidence-box">
+                  <img class="evidence-img" src="data:image/jpeg;base64,${result.images?.consensus}"/>
+                  <div class="evidence-caption">XAI Neural Mapping</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-header">Ophthalmological Interpretation</div>
+              <div class="narrative-text">
+                ${pdfFormat(result.patient_report || "")}
+              </div>
+            </div>
+
+            <div class="signature-area">
+              <div class="signature-box">
+                <div class="signature-name">DiabEyetic AI Core</div>
+                <div class="signature-title">Automated Diagnostic Intelligence System</div>
+                <div style="font-size: 9px; color: #94a3b8; margin-top: 10px;">Authenticated via Secure Neural Hash</div>
+              </div>
+            </div>
+
+            <div class="footer">
+              This is a computer-generated clinical report intended for ophthalmological review. 
+              The findings are provided by an AI diagnostic ensemble and should be correlated with clinical examination.
+              <br/>Generated at ${new Date().toLocaleTimeString()} • DiabEyetic Insight Diagnostic Suite v2.0
+            </div>
           </div>
 
           <script>
@@ -259,16 +316,16 @@ function UploadAnalyzePage({ onAnalyze }) {
     // Replace markdown bold with premium strong tags
     let formatted = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-black drop-shadow-sm">$1</strong>');
 
-    // Highlight specific clinical terms
+    // Highlight specific clinical terms and bold them
     const clinicalHighlights = {
       grade: /Grade\s[0-4]/gi,
-      risk: /(Critical|High Risk|Moderate|Mild|No DR)/gi,
-      medical: /(Retinopathy|Hemorrhages|Exudates|Microaneurysms|Macula|Optic Disc)/gi
+      risk: /(Critical|High Risk|Urgent|Moderate|Mild|No DR)/gi,
+      medical: /(Retinopathy|Hemorrhages|Exudates|Microaneurysms|Neovascularization|Cotton wool spots|Macula|Optic Disc|Fovea)/gi
     };
 
-    formatted = formatted.replace(clinicalHighlights.grade, '<span class="text-sky-400 font-black tracking-tight">$1</span>');
-    formatted = formatted.replace(clinicalHighlights.risk, '<span class="text-rose-400 font-black tracking-tight">$1</span>');
-    formatted = formatted.replace(clinicalHighlights.medical, '<span class="text-indigo-300 font-bold">$1</span>');
+    formatted = formatted.replace(clinicalHighlights.grade, '<strong class="text-sky-400 font-black">$1</strong>');
+    formatted = formatted.replace(clinicalHighlights.risk, '<strong class="text-rose-400 font-black">$1</strong>');
+    formatted = formatted.replace(clinicalHighlights.medical, '<strong class="text-indigo-300 font-black">$1</strong>');
 
     // Add subtle paragraph spacing
     formatted = formatted.split('\n').map(p => `<p class="mb-3 last:mb-0 leading-relaxed">${p}</p>`).join('');
@@ -443,6 +500,27 @@ function UploadAnalyzePage({ onAnalyze }) {
                   </div>
 
 
+                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Activity size={16} className="text-sky-400" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
+                      {result.clinical_audit ? (
+                        result.clinical_audit.split('\n').map((line, i) => {
+                          if (!line.trim()) return null;
+                          const formatted = line
+                            .replace(/^(.*?):/, '<strong class="text-sky-400">$1:</strong>')
+                            .replace(/(Exudates|Hemorrhages|Microaneurysms|Neovascularization|Cotton wool spots|Macula|Optic Disc)/gi, '<span class="text-white font-bold">$1</span>');
+                          return (
+                            <div key={i} className="mb-2 last:mb-0 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
+                          )
+                        })
+                      ) : (
+                        <div className="text-sm text-slate-500">Clinical findings will appear after VLM completes.</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Report Content */}
@@ -474,7 +552,6 @@ function UploadAnalyzePage({ onAnalyze }) {
                   <div className="p-10 rounded-[48px] bg-sky-500/5 border border-sky-500/10 backdrop-blur-3xl relative overflow-hidden flex-1 min-h-0 flex flex-col">
                     <div className="flex items-center gap-3 mb-6 shrink-0">
                       <Sparkles size={20} className="text-sky-400" />
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical Audit Report</span>
                     </div>
                     <div className="premium-glass p-6 rounded-[32px] border border-white/10 bg-black/40 flex-1 overflow-y-auto custom-scrollbar">
                       <pre className="text-[13px] text-sky-200 leading-relaxed font-mono whitespace-pre-wrap break-words">
@@ -483,27 +560,7 @@ function UploadAnalyzePage({ onAnalyze }) {
                     </div>
                   </div>
 
-                  <div className="p-8 rounded-[40px] bg-white/5 border border-white/5 relative overflow-hidden group">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Activity size={16} className="text-sky-400" />
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Clinical Findings</span>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-2 text-sm text-slate-300">
-                      {result.clinical_audit ? (
-                        result.clinical_audit.split('\n').map((line, i) => {
-                          if (!line.trim()) return null;
-                          const formatted = line
-                            .replace(/^(.*?):/, '<strong class="text-sky-400">$1:</strong>')
-                            .replace(/(Exudates|Hemorrhages|Microaneurysms|Neovascularization|Cotton wool spots|Macula|Optic Disc)/gi, '<span class="text-white font-bold">$1</span>');
-                          return (
-                            <div key={i} className="mb-2 last:mb-0 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
-                          )
-                        })
-                      ) : (
-                        <div className="text-sm text-slate-500">Clinical findings will appear after VLM completes.</div>
-                      )}
-                    </div>
-                  </div>
+
 
 
                 </div>

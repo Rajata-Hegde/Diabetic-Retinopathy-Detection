@@ -432,7 +432,7 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
     2) REDUCE OVER-CERTAINTY: Use terms like "appears consistent with", "suggestive of", or "possible". Avoid "definitive" unless unmistakable.
     3) IMPROVE CONSISTENCY: Ensure your findings align with the AI Confidence and XAI Agreement score provided.
     4) AVOID UNSUPPORTED QUANTIFICATION: Do not provide exact lesion counts unless you are 100% sure. Use "Multiple", "Few", or "None visible".
-    5) CONSTRAIN RECOMMENDATIONS: Stick to "Specialist evaluation recommended" or "Routine follow-up". No specific treatment or surgical advice.
+    5) AVOID MEDICAL ADVICE: Do not provide any specific treatment or surgical recommendations. Keep it focused on diagnostic reasoning only.
 
     TEMPLATE (KEEP IT COMPACT):
     --------------------------------------------------
@@ -459,9 +459,6 @@ def get_gemini_explanation(image_pil, heatmap_pil, grade_name, confidence, metho
     Interpretation Reliability:
     • XAI Consensus: [Low|Medium|High]
     • Localization: [Low|Medium|High]
-
-    Recommendation:
-    [Standard clinical recommendation]
     --------------------------------------------------
 
     Return strict JSON only with this schema:

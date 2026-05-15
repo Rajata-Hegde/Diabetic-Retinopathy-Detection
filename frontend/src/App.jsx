@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { Bell, Search, UserRound, LayoutDashboard, UploadCloud, BarChart3, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { navItems } from './data/mockData'
@@ -8,6 +8,43 @@ import UploadAnalyzePage from './pages/UploadAnalyzePage'
 import PatientRecordsPage from './pages/PatientRecordsPage'
 import Chatbot from './components/Chatbot'
 import './App.css'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-8">
+          <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-[40px] p-10 text-center">
+            <div className="h-16 w-16 bg-rose-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <LogOut className="text-rose-400 rotate-180" />
+            </div>
+            <h2 className="text-2xl font-black text-white mb-2">Neural Interface Error</h2>
+            <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+              {this.state.error?.message || "An unexpected error occurred in the diagnostic suite."}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="h-12 px-8 rounded-xl bg-sky-500 text-white font-bold hover:bg-sky-400 transition-all"
+            >
+              Restart Terminal
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 
 function App() {
   const [activePage, setActivePage] = useState('home')
@@ -86,7 +123,7 @@ function App() {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch('http://localhost:8000/analyze/start', {
+    const response = await fetch(`${API_URL}/analyze/start`, {
       method: 'POST',
       body: formData
     })
@@ -99,7 +136,7 @@ function App() {
 
     while (latest.status !== 'complete' && latest.status !== 'error') {
       await new Promise((resolve) => setTimeout(resolve, 1200))
-      const statusResponse = await fetch(`http://localhost:8000/analyze/status/${latest.analysis_id}`)
+      const statusResponse = await fetch(`${API_URL}/analyze/status/${latest.analysis_id}`)
       if (!statusResponse.ok) {
         throw new Error('Analysis status sync failed')
       }
@@ -118,7 +155,7 @@ function App() {
 
   const handleDeleteRecord = async (recordId) => {
     try {
-      const response = await fetch(`http://localhost:8000/records/${recordId}`, { method: 'DELETE' })
+      const response = await fetch(`${API_URL}/records/${recordId}`, { method: 'DELETE' })
       if (response.ok) {
         setPatientRecords(prev => prev.filter(r => r.id !== recordId))
         return true
@@ -130,117 +167,119 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 selection:bg-sky-500/30">
-      <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-black/20 backdrop-blur-2xl transition-all duration-500 xl:translate-x-0">
-        <div className="flex h-full flex-col p-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="mb-12"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 shadow-lg shadow-sky-500/20 flex items-center justify-center">
-                <LayoutDashboard size={20} className="text-white" />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[#020617] text-slate-100 selection:bg-sky-500/30">
+        <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-black/20 backdrop-blur-2xl transition-all duration-500 xl:translate-x-0">
+          <div className="flex h-full flex-col p-8">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mb-12"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 shadow-lg shadow-sky-500/20 flex items-center justify-center">
+                  <LayoutDashboard size={20} className="text-white" />
+                </div>
+                <h1 className="text-2xl font-black tracking-tighter text-white">DiabEyetic<span className="text-sky-500"> Insight</span></h1>
               </div>
-              <h1 className="text-2xl font-black tracking-tighter text-white">DiabEyetic<span className="text-sky-500"> Insight</span></h1>
+            </motion.div>
+
+            <nav className="flex-1 space-y-2">
+              {navItems.map((item, idx) => {
+                const Icon = item.icon
+                const isActive = activePage === item.key
+                return (
+                  <motion.button
+                    key={item.key}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    onClick={() => setActivePage(item.key)}
+                    className={`group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-300 ${isActive ? 'bg-sky-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                      }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="nav-glow"
+                        className="absolute inset-0 rounded-2xl bg-sky-500/5 shadow-[inset_0_0_20px_rgba(14,165,233,0.1)] border border-sky-500/20"
+                      />
+                    )}
+                    <Icon size={20} className={`relative z-10 ${isActive ? 'text-sky-400' : 'group-hover:text-sky-300'}`} />
+                    <span className="relative z-10 font-bold tracking-tight">{item.label}</span>
+                  </motion.button>
+                )
+              })}
+            </nav>
+
+            <div className="mt-auto space-y-6">
+              <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
+                <LogOut size={20} />
+                <span className="font-bold tracking-tight text-sm">Sign Out</span>
+              </button>
             </div>
-          </motion.div>
-
-          <nav className="flex-1 space-y-2">
-            {navItems.map((item, idx) => {
-              const Icon = item.icon
-              const isActive = activePage === item.key
-              return (
-                <motion.button
-                  key={item.key}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  onClick={() => setActivePage(item.key)}
-                  className={`group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-300 ${isActive ? 'bg-sky-500/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                    }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="nav-glow"
-                      className="absolute inset-0 rounded-2xl bg-sky-500/5 shadow-[inset_0_0_20px_rgba(14,165,233,0.1)] border border-sky-500/20"
-                    />
-                  )}
-                  <Icon size={20} className={`relative z-10 ${isActive ? 'text-sky-400' : 'group-hover:text-sky-300'}`} />
-                  <span className="relative z-10 font-bold tracking-tight">{item.label}</span>
-                </motion.button>
-              )
-            })}
-          </nav>
-
-          <div className="mt-auto space-y-6">
-            <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300">
-              <LogOut size={20} />
-              <span className="font-bold tracking-tight text-sm">Sign Out</span>
-            </button>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main className="min-h-screen xl:ml-72">
-        <header className="sticky top-0 z-40 flex items-center justify-between px-12 py-8 bg-[#020617]/80 backdrop-blur-md">
-          <div>
-            <h2 className="text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">AI-powered retinal health screening for everyone.</p>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sky-400 transition-colors" size={18} />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Find diagnostic record..."
-                className="h-12 w-80 rounded-2xl bg-white/5 border border-white/5 pl-12 pr-6 text-sm font-medium text-white outline-none focus:border-sky-500/30 focus:bg-white/10 transition-all"
-              />
+        <main className="min-h-screen xl:ml-72">
+          <header className="sticky top-0 z-40 flex items-center justify-between px-12 py-8 bg-[#020617]/80 backdrop-blur-md">
+            <div>
+              <h2 className="text-3xl font-black tracking-tight text-white">{pageTitle}</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">AI-powered retinal health screening for everyone.</p>
             </div>
 
-            <div className="flex items-center gap-4 border-l border-white/10 pl-6">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-white leading-none">Guest User</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Identity Verified</p>
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sky-400 transition-colors" size={18} />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Find diagnostic record..."
+                  className="h-12 w-80 rounded-2xl bg-white/5 border border-white/5 pl-12 pr-6 text-sm font-medium text-white outline-none focus:border-sky-500/30 focus:bg-white/10 transition-all"
+                />
               </div>
-              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 p-[2px]">
-                <div className="h-full w-full rounded-[14px] bg-slate-900 flex items-center justify-center overflow-hidden">
-                  <UserRound className="text-sky-400" size={20} />
+
+              <div className="flex items-center gap-4 border-l border-white/10 pl-6">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-bold text-white leading-none">Guest User</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-sky-400 mt-1">Identity Verified</p>
+                </div>
+                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 p-[2px]">
+                  <div className="h-full w-full rounded-[14px] bg-slate-900 flex items-center justify-center overflow-hidden">
+                    <UserRound className="text-sky-400" size={20} />
+                  </div>
                 </div>
               </div>
             </div>
+          </header>
+
+          <div className="px-12 pb-12">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePage}
+                initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {activePage === 'home' && (
+                  <HomePage
+                    onStartAnalysis={() => setActivePage('upload')}
+                    onViewDashboard={() => setActivePage('dashboard')}
+                    stats={appStats}
+                  />
+                )}
+                {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
+                {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
+                {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
+
+              </motion.div>
+            </AnimatePresence>
           </div>
-        </header>
+        </main>
 
-        <div className="px-12 pb-12">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activePage}
-              initial={{ opacity: 0, y: 10, scale: 0.99 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.99 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {activePage === 'home' && (
-                <HomePage
-                  onStartAnalysis={() => setActivePage('upload')}
-                  onViewDashboard={() => setActivePage('dashboard')}
-                  stats={appStats}
-                />
-              )}
-              {activePage === 'dashboard' && <DashboardHome records={patientRecords} stats={appStats} />}
-              {activePage === 'upload' && <UploadAnalyzePage onAnalyze={handleDiagnosticAnalysis} />}
-              {activePage === 'records' && <PatientRecordsPage records={searchedRecords} onDelete={handleDeleteRecord} />}
-
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-
-      <Chatbot />
-    </div>
+        <Chatbot />
+      </div>
+    </ErrorBoundary>
   )
 }
 
